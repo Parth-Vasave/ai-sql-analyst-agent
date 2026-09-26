@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # Explicit bash runs with -eo pipefail, so `pytest | tee` still fails when pytest does.
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the minimum (ruff target-version); 3.12 is what backend/Dockerfile ships.
+        python-version: ["3.11", "3.12"]
+    services:
+      # Disposable server for the integration tests. The superuser password only exists
+      # inside this job's throwaway container.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            scripts/requirements.txt
+      - run: pip install -r backend/requirements-dev.txt -r scripts/requirements.txt
+
+      # Same setup as .claude/hooks/session-start.sh: a non-superuser owner that can create
+      # roles, an empty test database, and random per-run passwords.
+      - name: Create test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          owner_password="$(openssl rand -hex 16)"
+          agent_password="$(openssl rand -hex 16)"
+          echo "::add-mask::$owner_password"
+          echo "::add-mask::$agent_password"
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -v pw="$owner_password" <<'SQL'
+          CREATE ROLE emissions_owner LOGIN CREATEROLE PASSWORD :'pw';
+          CREATE DATABASE emissions_test OWNER emissions_owner;
+          SQL
+          {
+            echo "TEST_ADMIN_DATABASE_URL=postgresql://emissions_owner:${owner_password}@localhost:5432/emissions_test"
+            echo "TEST_SQL_AGENT_PASSWORD=${agent_password}"
+          } >> "$GITHUB_ENV"
+
+      # The integration tests skip themselves when the database variables are missing. Fail on
+      # any skip instead, so CI cannot go green on the unit tests alone.
+      - name: Pipeline tests
+        run: python -m pytest scripts/tests -rs | tee "$RUNNER_TEMP/pipeline.txt"
+      - name: Backend tests
+        working-directory: backend
+        run: python -m pytest -rs | tee "$RUNNER_TEMP/backend.txt"
+      - name: Evaluation tests (no LLM, no database)
+        run: python -m pytest evaluation/tests -rs | tee "$RUNNER_TEMP/evaluation.txt"
+      - name: No tests skipped
+        run: |
+          if grep -h "^SKIPPED" "$RUNNER_TEMP"/*.txt; then
+            echo "::error::Tests were skipped; the integration suites must run in CI."
+            exit 1
+          fi

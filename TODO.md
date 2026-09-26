@@ -190,6 +190,16 @@ Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
   (GitHub release assets are not served for unattached repositories); run it locally
 Milestone 13 — Tests, Docker, README, Vercel deployment, polish
 
+* [x] CI (.github/workflows/ci.yml): ruff check + format; pipeline, backend and evaluation suites on
+      Python 3.11 and 3.12 against a PostgreSQL 16 service with a non-superuser owner and random
+      per-run passwords (same setup as the session-start hook). Any skipped test fails the job, so
+      the integration tests cannot silently drop out. The offline SQL safety suite is not in CI: it
+      needs the full pinned OWID data (row-count check), which is not committed
+* [ ] README
+* [ ] Request rate limiting (before any public deployment)
+* [ ] Docker check from a clean start
+* [ ] Deployment (Vercel + Neon), after the frontend
+
 ⸻
 
 Completed Work
@@ -299,4 +309,5 @@ In Claude Code on the web, .claude/hooks/session-start.sh does this automaticall
 dependencies, starts the local PostgreSQL cluster (down after every container restart), creates the
 emissions_test database and owner role with fresh random passwords, and exports both variables. The
 full OWID demo database is not loaded by the hook; seed it by hand when a live check needs it.
-Run tests: `python -m pytest scripts/tests` and `cd backend && python -m pytest`.
+Run tests: `python -m pytest scripts/tests`, `cd backend && python -m pytest` and
+`python -m pytest evaluation/tests`; lint: `ruff check . && ruff format --check .`. CI runs the same.
