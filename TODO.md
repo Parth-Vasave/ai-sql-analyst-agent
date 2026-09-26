@@ -2,14 +2,15 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 5 — Query planner (Milestone 3 and the LIMIT rewrite of Milestone 4 done)
+Milestone 6 — Automatic SQL repair/retry (Milestones 3 and 5 done)
 
 Current Objective
 
-Milestone 5 (query planner), then Milestone 6 (repair/retry). The validator's rejection codes and the
-executor's error categories are the inputs for repair; Milestone 4's "retry a timed-out query with a
-cheaper one" belongs to that same loop. Both safety layers (read-only account + SQL validator) are now
-in place; before a public deployment still add request rate limiting (Milestone 13).
+Milestone 6 (repair/retry, max MAX_RETRIES). The validator's rejection codes and the executor's error
+categories are the inputs for repair; Milestone 4's "retry a timed-out query with a cheaper one"
+belongs to that same loop. The plan (Milestone 5) gives the repair prompt the intended query shape.
+Both safety layers (read-only account + SQL validator) are in place; before a public deployment
+still add request rate limiting (Milestone 13).
 
 ⸻
 
@@ -86,6 +87,15 @@ Milestone 4 — Read-only user + timeout + LIMIT enforcement
 * [ ] Timeout surfaced as a trace event with retry for a cheaper query
 
 Milestone 5 — Query planner
+
+* [x] Structured plan returned with the SQL in the same LLM call (prompt sql-generator/2): intent,
+      tables, metrics, filters, group_by, order_by, limit, assumptions. Size-limited, validated.
+* [x] Clarification: the model asks a question (status "needs_clarification") only when no reading
+      is a reasonable default; otherwise it answers and states its assumptions in the plan
+* [x] Deterministic plan check against the validated SQL (tables, limit); mismatches recorded as
+      plan_warnings in the trace, not blocking (the validated SQL is what runs)
+* [x] Plan returned in the API response and its intent in the trace; tests for parsing, the
+      SQL-or-question rule, the plan check and the clarification path
 Milestone 6 — Automatic SQL repair/retry (max 2)
 Milestone 7 — Result validation (deterministic checks)
 Milestone 8 — Natural-language answer generation
@@ -115,6 +125,12 @@ Completed Work
 * Milestone 3 (2026-09-26): 160 backend + 35 pipeline tests pass against PostgreSQL 16. Live check
   on gemini-3.5-flash: validated queries ran with the validation step taking 4–10 ms; a prompt
   injection asking to delete data was declined by the model (the validator is the backstop).
+* Milestone 5 (2026-09-26): 172 backend + 35 pipeline tests pass. Live, 4 questions across
+  gemini-3.5/3.6/3.7-flash (quota and 503s forced model switches): plans matched the SQL (no
+  plan_warnings) for a ranking, a trend and a lookup; "Which country is the biggest polluter?" and
+  "Show me the data for Georgia" were answered with stated assumptions (latest-year annual CO2; the
+  country Georgia) rather than a clarification question. The clarification path is so far covered by
+  tests only; Milestone 11's ambiguous-question category will measure it.
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 
@@ -137,6 +153,9 @@ Important Decisions
   "countries" questions can exclude them; "(GCP)" duplicate regions are excluded.
 * Security boundary is the database: sql_agent has SELECT on four tables only; read-only default and
   statement_timeout are set on the role and again per session. The SQL validator is a second layer.
+* Query plan and SQL come from ONE LLM call, not a separate planner call: free-tier quota (5/min,
+  ~20/day per model) and latency make a second call costly, and there is no evaluation yet showing it
+  would help. Revisit with Milestone 11 results.
 * SQL validator design: allow-list, not deny-list, wherever possible (statement type, tables from the
   profile, unmodelled functions). The executed SQL is regenerated from the checked syntax tree, so a
   parser difference between sqlglot and the database cannot smuggle in unchecked text. Rejection

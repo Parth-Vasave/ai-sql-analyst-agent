@@ -15,8 +15,22 @@ from app.database.profile import ColumnProfile, DatabaseProfile, SamplingMode, T
 from app.llm.client import ScriptedLLMClient
 
 
-def reply(sql: str | None, explanation: str = "test", chart: str = "none") -> str:
-    return json.dumps({"sql": sql, "explanation": explanation, "chart_suggestion": chart})
+def reply(
+    sql: str | None,
+    explanation: str = "test",
+    chart: str = "none",
+    plan: dict | None = None,
+    clarification: str | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "plan": plan,
+            "sql": sql,
+            "clarification_question": clarification,
+            "explanation": explanation,
+            "chart_suggestion": chart,
+        }
+    )
 
 
 def _profile(n_tables: int) -> DatabaseProfile:
@@ -119,6 +133,44 @@ def test_missing_limit_is_added_before_execution(shop) -> None:
     assert result.metadata.row_count == 50 and result.metadata.tables_used == ["shop.order_items"]
     validation = next(e for e in result.trace if e.step == "sql_validation")
     assert validation.detail["limit_action"] == "added"
+
+
+def test_plan_is_returned_and_checked_against_the_sql(shop) -> None:
+    plan = {"intent": "aggregate", "tables": ["shop.orders", "shop.customers"], "limit": 10,
+            "assumptions": ["all order statuses count"]}  # fmt: skip
+    sql = "SELECT status, count(*) AS orders FROM shop.orders GROUP BY status LIMIT 10"
+    llm = ScriptedLLMClient(lambda s, u: reply(sql, plan=plan))
+    result = AgentController(llm, max_rows=100).run("How many orders per status?", shop)
+
+    assert result.status == "success"
+    assert result.plan is not None and result.plan.assumptions == ["all order statuses count"]
+    generation = next(e for e in result.trace if e.step == "sql_generation")
+    assert generation.detail["intent"] == "aggregate"
+    validation = next(e for e in result.trace if e.step == "sql_validation")
+    assert validation.detail["plan_warnings"] == ["planned tables not used by the SQL: customers"]
+
+
+def test_missing_plan_is_noted_in_the_trace(shop) -> None:
+    llm = ScriptedLLMClient(lambda s, u: reply("SELECT id FROM shop.orders LIMIT 1"))
+    result = AgentController(llm, max_rows=100).run("One order", shop)
+    assert result.status == "success" and result.plan is None
+    validation = next(e for e in result.trace if e.step == "sql_validation")
+    assert validation.detail["plan_warnings"] == ["no plan returned"]
+
+
+def test_ambiguous_question_asks_for_clarification(shop) -> None:
+    llm = ScriptedLLMClient(
+        lambda s, u: reply(
+            None,
+            "Best could mean revenue or order count.",
+            clarification="Best by revenue or by number of orders?",
+        )
+    )
+    result = AgentController(llm, max_rows=100).run("Who are the best customers?", shop)
+    assert result.status == "needs_clarification"
+    assert result.clarification_question == "Best by revenue or by number of orders?"
+    assert result.sql is None and result.rows == []
+    assert "sql_validation" not in [e.step for e in result.trace]
 
 
 def test_unanswerable_question(shop) -> None:
