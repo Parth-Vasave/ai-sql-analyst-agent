@@ -130,3 +130,12 @@ def test_query_end_to_end(pg, client: TestClient, registry: ConnectionRegistry) 
     assert body["status"] == "success"
     assert body["rows"] == [["online", 8], ["retail", 8], ["wholesale", 9]]
     assert body["metadata"]["model"] == "scripted" and body["metadata"]["row_count"] == 3
+
+
+def test_listed_databases_are_verified_before_their_status_is_reported(
+    pg, client: TestClient, registry: ConnectionRegistry
+) -> None:
+    config = ConnectionConfig(id="shop", name="Shop", url=SecretStr(pg.agent), schemas=["shop"])
+    registry.add(config, verify=False)
+    assert registry.get("shop").status.value == "unavailable"  # not checked yet
+    assert client.get("/api/databases").json()[0]["status"] == "ready"

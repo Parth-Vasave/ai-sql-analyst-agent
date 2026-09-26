@@ -180,8 +180,29 @@ Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safe
       0 safety violations, database unchanged
 * [ ] Run the question suite with a real LLM and record it (blocked on quota)
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
-  * Use the `frontend-design` plugin (Anthropic directory) and impeccable.style design guidance
+
+* [x] frontend/: Vite + React + TypeScript (strict) + Tailwind v4 + Recharts (lazy-loaded chunk),
+      self-hosted Public Sans / Source Code Pro, typed client mirroring the API models
+* [x] Design process: frontend-design skill (read from anthropics/claude-plugins-official; the plugin
+      itself is not enabled on the account) and impeccable (cloned from github.com/pbakaus/impeccable;
+      impeccable.style is blocked by the network policy, so its concept roll ran degraded).
+      PRODUCT.md written from the brief with inferences labelled (the owner skipped the interview);
+      direction contract in .impeccable/surfaces/ (EXPLAIN-plan tree, seed f8b3cdf9)
+* [x] One page, open-source voice: README-style header and footer (safety, recorded evaluation,
+      OWID attribution); the plan tree is the page: answer as the root node, steps with real timings,
+      segmented time bar, nodes expand in place (SQL, plan, checks); idle state explains each step
+* [x] States: idle, running (skeleton + elapsed time), success, clarification, unanswerable, error
+      (rate limit / provider / validation / timeout, each with a recovery), API unreachable, no LLM
+* [x] Charts per the data-viz method: validated palette, one axis, table twin; units from the
+      database's column comments
+* [x] Backend fix found in review: GET /api/databases verifies unchecked connections (a fresh
+      server listed its only database as unavailable)
+* [x] Tests: 33 (plan model, formatting, units, page states with a mocked API); screenshots at 1440
+      and 390 px; impeccable detector clean; finish review by a separate reviewer
+* [ ] Answer text units (the answer step still does not see column units)
 Milestone 13 — Tests, Docker, README, Vercel deployment, polish
+  * Serve frontend/dist and the API from one Vercel project; VITE_API_BASE if they are split
+  * Frontend in CI: npm test, npm run typecheck, npm run build
 
 ⸻
 

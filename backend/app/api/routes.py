@@ -82,6 +82,9 @@ def health(response: Response, registry: Registry) -> HealthResponse:
 
 @router.get("/databases", response_model=list[DatabaseInfo])
 def list_databases(registry: Registry) -> list[DatabaseInfo]:
+    for connection in registry.all():
+        if connection.status is ConnectionStatus.UNAVAILABLE:  # never checked yet, or down: try now
+            connection.verify()
     return [DatabaseInfo.from_connection(c) for c in registry.all()]
 
 

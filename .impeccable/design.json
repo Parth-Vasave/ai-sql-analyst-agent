@@ -1,0 +1,618 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T14:26:46+00:00",
+  "title": "Design System: AI SQL Analyst",
+  "extensions": {
+    "colorMeta": {
+      "plan-blue": {
+        "role": "primary",
+        "displayName": "Plan Blue",
+        "canonical": "#1c5cab",
+        "tonalRamp": [
+          "oklch(15% 0.035 256.1)",
+          "oklch(27% 0.062 256.1)",
+          "oklch(39% 0.095 256.1)",
+          "oklch(51% 0.129 256.1)",
+          "oklch(63% 0.118 256.1)",
+          "oklch(75% 0.084 256.1)",
+          "oklch(85% 0.056 256.1)",
+          "oklch(95% 0.035 256.1)"
+        ]
+      },
+      "plan-blue-deep": {
+        "role": "primary",
+        "displayName": "Plan Blue Deep",
+        "canonical": "#184f95",
+        "tonalRamp": [
+          "oklch(15% 0.032 256.5)",
+          "oklch(27% 0.056 256.5)",
+          "oklch(39% 0.087 256.5)",
+          "oklch(51% 0.118 256.5)",
+          "oklch(63% 0.108 256.5)",
+          "oklch(75% 0.077 256.5)",
+          "oklch(85% 0.051 256.5)",
+          "oklch(95% 0.032 256.5)"
+        ]
+      },
+      "plan-blue-wash": {
+        "role": "primary",
+        "displayName": "Plan Blue Wash",
+        "canonical": "#e3edfb",
+        "tonalRamp": [
+          "oklch(15% 0.005 256.7)",
+          "oklch(27% 0.010 256.7)",
+          "oklch(39% 0.015 256.7)",
+          "oklch(51% 0.020 256.7)",
+          "oklch(63% 0.018 256.7)",
+          "oklch(75% 0.013 256.7)",
+          "oklch(85% 0.009 256.7)",
+          "oklch(95% 0.005 256.7)"
+        ]
+      },
+      "cool-ground": {
+        "role": "neutral",
+        "displayName": "Cool Ground",
+        "canonical": "#f3f5f7",
+        "tonalRamp": [
+          "oklch(15% 0.003 247.9)",
+          "oklch(27% 0.003 247.9)",
+          "oklch(39% 0.003 247.9)",
+          "oklch(51% 0.003 247.9)",
+          "oklch(63% 0.003 247.9)",
+          "oklch(75% 0.003 247.9)",
+          "oklch(85% 0.003 247.9)",
+          "oklch(95% 0.003 247.9)"
+        ]
+      },
+      "panel-white": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(27% 0.000 89.9)",
+          "oklch(39% 0.000 89.9)",
+          "oklch(51% 0.000 89.9)",
+          "oklch(63% 0.000 89.9)",
+          "oklch(75% 0.000 89.9)",
+          "oklch(85% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "well-grey": {
+        "role": "neutral",
+        "displayName": "Well Grey",
+        "canonical": "#edf1f5",
+        "tonalRamp": [
+          "oklch(15% 0.007 247.9)",
+          "oklch(27% 0.007 247.9)",
+          "oklch(39% 0.007 247.9)",
+          "oklch(51% 0.007 247.9)",
+          "oklch(63% 0.007 247.9)",
+          "oklch(75% 0.007 247.9)",
+          "oklch(85% 0.007 247.9)",
+          "oklch(95% 0.007 247.9)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1a1e24",
+        "tonalRamp": [
+          "oklch(15% 0.013 258.4)",
+          "oklch(27% 0.013 258.4)",
+          "oklch(39% 0.013 258.4)",
+          "oklch(51% 0.013 258.4)",
+          "oklch(63% 0.013 258.4)",
+          "oklch(75% 0.013 258.4)",
+          "oklch(85% 0.013 258.4)",
+          "oklch(95% 0.013 258.4)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2",
+        "canonical": "#505a66",
+        "tonalRamp": [
+          "oklch(15% 0.006 253.1)",
+          "oklch(27% 0.010 253.1)",
+          "oklch(39% 0.016 253.1)",
+          "oklch(51% 0.021 253.1)",
+          "oklch(63% 0.020 253.1)",
+          "oklch(75% 0.014 253.1)",
+          "oklch(85% 0.009 253.1)",
+          "oklch(95% 0.006 253.1)"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3",
+        "canonical": "#626b76",
+        "tonalRamp": [
+          "oklch(15% 0.005 253.5)",
+          "oklch(27% 0.009 253.5)",
+          "oklch(39% 0.014 253.5)",
+          "oklch(51% 0.019 253.5)",
+          "oklch(63% 0.017 253.5)",
+          "oklch(75% 0.012 253.5)",
+          "oklch(85% 0.008 253.5)",
+          "oklch(95% 0.005 253.5)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d5dbe2",
+        "tonalRamp": [
+          "oklch(15% 0.012 252.1)",
+          "oklch(27% 0.012 252.1)",
+          "oklch(39% 0.012 252.1)",
+          "oklch(51% 0.012 252.1)",
+          "oklch(63% 0.012 252.1)",
+          "oklch(75% 0.012 252.1)",
+          "oklch(85% 0.012 252.1)",
+          "oklch(95% 0.012 252.1)"
+        ]
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "#b8c1cc",
+        "tonalRamp": [
+          "oklch(15% 0.018 253.4)",
+          "oklch(27% 0.018 253.4)",
+          "oklch(39% 0.018 253.4)",
+          "oklch(51% 0.018 253.4)",
+          "oklch(63% 0.018 253.4)",
+          "oklch(75% 0.018 253.4)",
+          "oklch(85% 0.018 253.4)",
+          "oklch(95% 0.018 253.4)"
+        ]
+      },
+      "status-good": {
+        "role": "status",
+        "displayName": "Good",
+        "canonical": "#0f7a2e",
+        "tonalRamp": [
+          "oklch(15% 0.035 147.2)",
+          "oklch(27% 0.062 147.2)",
+          "oklch(39% 0.095 147.2)",
+          "oklch(51% 0.129 147.2)",
+          "oklch(63% 0.118 147.2)",
+          "oklch(75% 0.084 147.2)",
+          "oklch(85% 0.056 147.2)",
+          "oklch(95% 0.035 147.2)"
+        ]
+      },
+      "status-warn": {
+        "role": "status",
+        "displayName": "Warn",
+        "canonical": "#8a5a00",
+        "tonalRamp": [
+          "oklch(15% 0.027 73.3)",
+          "oklch(27% 0.048 73.3)",
+          "oklch(39% 0.073 73.3)",
+          "oklch(51% 0.099 73.3)",
+          "oklch(63% 0.091 73.3)",
+          "oklch(75% 0.065 73.3)",
+          "oklch(85% 0.043 73.3)",
+          "oklch(95% 0.027 73.3)"
+        ]
+      },
+      "status-bad": {
+        "role": "status",
+        "displayName": "Bad",
+        "canonical": "#b3261e",
+        "tonalRamp": [
+          "oklch(15% 0.035 28.7)",
+          "oklch(27% 0.062 28.7)",
+          "oklch(39% 0.095 28.7)",
+          "oklch(51% 0.129 28.7)",
+          "oklch(63% 0.118 28.7)",
+          "oklch(75% 0.084 28.7)",
+          "oklch(85% 0.056 28.7)",
+          "oklch(95% 0.035 28.7)"
+        ]
+      },
+      "bad-wash": {
+        "role": "status",
+        "displayName": "Bad Wash",
+        "canonical": "#fbeceb",
+        "tonalRamp": [
+          "oklch(15% 0.016 22.1)",
+          "oklch(27% 0.016 22.1)",
+          "oklch(39% 0.016 22.1)",
+          "oklch(51% 0.016 22.1)",
+          "oklch(63% 0.016 22.1)",
+          "oklch(75% 0.016 22.1)",
+          "oklch(85% 0.016 22.1)",
+          "oklch(95% 0.016 22.1)"
+        ]
+      },
+      "warn-wash": {
+        "role": "status",
+        "displayName": "Warn Wash",
+        "canonical": "#fbf2df",
+        "tonalRamp": [
+          "oklch(15% 0.007 85.7)",
+          "oklch(27% 0.012 85.7)",
+          "oklch(39% 0.018 85.7)",
+          "oklch(51% 0.025 85.7)",
+          "oklch(63% 0.023 85.7)",
+          "oklch(75% 0.016 85.7)",
+          "oklch(85% 0.011 85.7)",
+          "oklch(95% 0.007 85.7)"
+        ]
+      },
+      "series-1": {
+        "role": "data",
+        "displayName": "Series 1",
+        "canonical": "#2a78d6",
+        "tonalRamp": [
+          "oklch(15% 0.035 255.5)",
+          "oklch(27% 0.062 255.5)",
+          "oklch(39% 0.095 255.5)",
+          "oklch(51% 0.129 255.5)",
+          "oklch(63% 0.118 255.5)",
+          "oklch(75% 0.084 255.5)",
+          "oklch(85% 0.056 255.5)",
+          "oklch(95% 0.035 255.5)"
+        ]
+      },
+      "series-2": {
+        "role": "data",
+        "displayName": "Series 2",
+        "canonical": "#eb6834",
+        "tonalRamp": [
+          "oklch(15% 0.035 40.6)",
+          "oklch(27% 0.062 40.6)",
+          "oklch(39% 0.095 40.6)",
+          "oklch(51% 0.129 40.6)",
+          "oklch(63% 0.118 40.6)",
+          "oklch(75% 0.084 40.6)",
+          "oklch(85% 0.056 40.6)",
+          "oklch(95% 0.035 40.6)"
+        ]
+      },
+      "series-3": {
+        "role": "data",
+        "displayName": "Series 3",
+        "canonical": "#1baf7a",
+        "tonalRamp": [
+          "oklch(15% 0.035 162.1)",
+          "oklch(27% 0.062 162.1)",
+          "oklch(39% 0.095 162.1)",
+          "oklch(51% 0.129 162.1)",
+          "oklch(63% 0.118 162.1)",
+          "oklch(75% 0.084 162.1)",
+          "oklch(85% 0.056 162.1)",
+          "oklch(95% 0.035 162.1)"
+        ]
+      },
+      "series-4": {
+        "role": "data",
+        "displayName": "Series 4",
+        "canonical": "#eda100",
+        "tonalRamp": [
+          "oklch(15% 0.035 75.1)",
+          "oklch(27% 0.062 75.1)",
+          "oklch(39% 0.095 75.1)",
+          "oklch(51% 0.129 75.1)",
+          "oklch(63% 0.118 75.1)",
+          "oklch(75% 0.084 75.1)",
+          "oklch(85% 0.056 75.1)",
+          "oklch(95% 0.035 75.1)"
+        ]
+      },
+      "series-5": {
+        "role": "data",
+        "displayName": "Series 5",
+        "canonical": "#e87ba4",
+        "tonalRamp": [
+          "oklch(15% 0.035 357.4)",
+          "oklch(27% 0.062 357.4)",
+          "oklch(39% 0.095 357.4)",
+          "oklch(51% 0.129 357.4)",
+          "oklch(63% 0.118 357.4)",
+          "oklch(75% 0.084 357.4)",
+          "oklch(85% 0.056 357.4)",
+          "oklch(95% 0.035 357.4)"
+        ]
+      },
+      "series-6": {
+        "role": "data",
+        "displayName": "Series 6",
+        "canonical": "#008300",
+        "tonalRamp": [
+          "oklch(15% 0.035 142.5)",
+          "oklch(27% 0.062 142.5)",
+          "oklch(39% 0.095 142.5)",
+          "oklch(51% 0.129 142.5)",
+          "oklch(63% 0.118 142.5)",
+          "oklch(75% 0.084 142.5)",
+          "oklch(85% 0.056 142.5)",
+          "oklch(95% 0.035 142.5)"
+        ]
+      },
+      "series-7": {
+        "role": "data",
+        "displayName": "Series 7",
+        "canonical": "#4a3aa7",
+        "tonalRamp": [
+          "oklch(15% 0.035 283.6)",
+          "oklch(27% 0.062 283.6)",
+          "oklch(39% 0.095 283.6)",
+          "oklch(51% 0.129 283.6)",
+          "oklch(63% 0.118 283.6)",
+          "oklch(75% 0.084 283.6)",
+          "oklch(85% 0.056 283.6)",
+          "oklch(95% 0.035 283.6)"
+        ]
+      },
+      "series-8": {
+        "role": "data",
+        "displayName": "Series 8",
+        "canonical": "#e34948",
+        "tonalRamp": [
+          "oklch(15% 0.035 24.9)",
+          "oklch(27% 0.062 24.9)",
+          "oklch(39% 0.095 24.9)",
+          "oklch(51% 0.129 24.9)",
+          "oklch(63% 0.118 24.9)",
+          "oklch(75% 0.084 24.9)",
+          "oklch(85% 0.056 24.9)",
+          "oklch(95% 0.035 24.9)"
+        ]
+      },
+      "ramp-250": {
+        "role": "data",
+        "displayName": "Time Ramp 250",
+        "canonical": "#86b6ef",
+        "tonalRamp": [
+          "oklch(15% 0.024 253.2)",
+          "oklch(27% 0.043 253.2)",
+          "oklch(39% 0.066 253.2)",
+          "oklch(51% 0.089 253.2)",
+          "oklch(63% 0.082 253.2)",
+          "oklch(75% 0.058 253.2)",
+          "oklch(85% 0.039 253.2)",
+          "oklch(95% 0.024 253.2)"
+        ]
+      },
+      "ramp-400": {
+        "role": "data",
+        "displayName": "Time Ramp 400",
+        "canonical": "#3987e5",
+        "tonalRamp": [
+          "oklch(15% 0.035 255.1)",
+          "oklch(27% 0.062 255.1)",
+          "oklch(39% 0.095 255.1)",
+          "oklch(51% 0.129 255.1)",
+          "oklch(63% 0.118 255.1)",
+          "oklch(75% 0.084 255.1)",
+          "oklch(85% 0.056 255.1)",
+          "oklch(95% 0.035 255.1)"
+        ]
+      },
+      "ramp-550": {
+        "role": "data",
+        "displayName": "Time Ramp 550",
+        "canonical": "#1c5cab",
+        "tonalRamp": [
+          "oklch(15% 0.035 256.1)",
+          "oklch(27% 0.062 256.1)",
+          "oklch(39% 0.095 256.1)",
+          "oklch(51% 0.129 256.1)",
+          "oklch(63% 0.118 256.1)",
+          "oklch(75% 0.084 256.1)",
+          "oklch(85% 0.056 256.1)",
+          "oklch(95% 0.035 256.1)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Single-number stat answers only, tabular."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Project name in the header; one per page."
+      },
+      "answer": {
+        "displayName": "Answer",
+        "purpose": "The written answer under the root node, max 70ch."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Plan node names, callout titles, footer headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "The question field."
+      },
+      "body-sm": {
+        "displayName": "Body Small",
+        "purpose": "Summaries, captions, labels, chips, table cells, footer copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Hints, plan column labels, attempt tags."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "SQL, table and column names, model, prompt and request ids only."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "chevron-turn",
+        "value": "transform 150ms (default easing)",
+        "purpose": "Chevron rotates 90 degrees when a plan node or the schema list opens."
+      },
+      {
+        "name": "time-bar-grow",
+        "value": "width 250ms ease-out",
+        "purpose": "Time bars grow from zero to their share once when a result arrives."
+      },
+      {
+        "name": "running-pulse",
+        "value": "animate-pulse on well-grey placeholders",
+        "purpose": "Time cells, bars and the chart slot while the plan runs or the chart loads."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition-duration and animation-duration 0.01ms",
+        "purpose": "prefers-reduced-motion: reduce collapses all motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Ask Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single filled button: runs the question.",
+      "html": "<button class=\"ds-btn-primary\">Ask</button>",
+      "css": ".ds-btn-primary { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; background: var(--color-accent, #1c5cab); color: #ffffff; font-size: 0.875rem; font-weight: 600; line-height: 1.375rem; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; } .ds-btn-primary:hover { background: var(--color-accent-hover, #184f95); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-accent, #1c5cab); outline-offset: 2px; } .ds-btn-primary:disabled { background: var(--color-rule-strong, #b8c1cc); cursor: not-allowed; }"
+    },
+    {
+      "name": "Example Question Chip",
+      "kind": "chip",
+      "refersTo": "chip-example",
+      "description": "Example question from the evaluation set; click fills and runs it.",
+      "html": "<button class=\"ds-chip\">Which 5 countries emitted the most CO2 in 2023?</button>",
+      "css": ".ds-chip { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; background: #ffffff; color: var(--color-ink-2, #505a66); font-size: 0.875rem; line-height: 1.375rem; padding: 4px 10px; border: 1px solid var(--color-rule, #d5dbe2); border-radius: 3px; text-align: left; cursor: pointer; } .ds-chip:hover { border-color: var(--color-accent, #1c5cab); color: var(--color-accent, #1c5cab); } .ds-chip:focus-visible { outline: 2px solid var(--color-accent, #1c5cab); outline-offset: 2px; }"
+    },
+    {
+      "name": "Question Field",
+      "kind": "input",
+      "refersTo": "input-question",
+      "description": "Labelled two-row textarea for the question.",
+      "html": "<label class=\"ds-label\" for=\"ds-q\">Question</label><textarea id=\"ds-q\" class=\"ds-input\" rows=\"2\" placeholder=\"For example: which 5 countries emitted the most CO2 in 2023?\"></textarea>",
+      "css": ".ds-label { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; display: block; font-size: 0.875rem; font-weight: 500; color: #1a1e24; margin-bottom: 6px; } .ds-input { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; width: 100%; min-height: 3.25rem; background: #ffffff; color: #1a1e24; font-size: 1rem; line-height: 1.625rem; padding: 8px 12px; border: 1px solid var(--color-rule-strong, #b8c1cc); border-radius: 3px; caret-color: #1c5cab; resize: vertical; } .ds-input::placeholder { color: #626b76; } .ds-input:hover { border-color: #626b76; } .ds-input:focus-visible { outline: 2px solid var(--color-accent, #1c5cab); outline-offset: 2px; }"
+    },
+    {
+      "name": "Project Header",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "README-style header: name, one paragraph, three plain links.",
+      "html": "<header class=\"ds-head\"><div><h1>AI SQL Analyst</h1><p>An open-source agent that answers questions about a database in SQL.</p></div><nav><a href=\"#\">Source code</a><a href=\"#\">Evaluation</a><a href=\"#\">Data source</a></nav></header>",
+      "css": ".ds-head { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; background: #ffffff; border-bottom: 1px solid #d5dbe2; padding: 24px; } .ds-head h1 { margin: 0; font-size: 1.4375rem; line-height: 2rem; font-weight: 600; letter-spacing: -0.01em; color: #1a1e24; } .ds-head p { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.375rem; color: #505a66; } .ds-head nav { display: flex; gap: 20px; font-size: 0.875rem; } .ds-head a { color: #1c5cab; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; text-decoration-color: color-mix(in srgb, #1c5cab 45%, transparent); } .ds-head a:hover { text-decoration-color: currentColor; } .ds-head a:focus-visible { outline: 2px solid var(--color-accent, #1c5cab); outline-offset: 2px; }"
+    },
+    {
+      "name": "Plan Tree",
+      "kind": "custom",
+      "refersTo": "panel-plan",
+      "description": "Signature component: EXPLAIN-style node rows with elbow connectors, status icons, tabular times and share-of-total bars.",
+      "html": "<section class=\"ds-plan\"><div class=\"ds-plan-cap\"><span>Plan for: Which 5 countries emitted the most CO2 in 2023?</span><span class=\"ds-plan-cols\"><span>Time</span><span>Share of total</span></span></div><ol><li class=\"ds-node\"><span class=\"ds-ico ds-good\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"done\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/></svg></span><div class=\"ds-txt\"><button class=\"ds-name\">Answer <svg class=\"ds-chev\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button><p>5 rows</p></div><span class=\"ds-time\">1.6 s</span><span class=\"ds-seg\"><i style=\"flex-grow:0.08;background:#86b6ef\"></i><i style=\"flex-grow:0.88;background:#1c5cab\"></i><i style=\"flex-grow:0.02;background:#86b6ef\"></i></span></li><li class=\"ds-node ds-d1\"><span class=\"ds-elbow\"></span><span class=\"ds-ico ds-good\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"done\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/></svg></span><div class=\"ds-txt\"><button class=\"ds-name\">SQL generation <svg class=\"ds-chev\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button><p>ranking plan</p></div><span class=\"ds-time\">1.4 s</span><span class=\"ds-track\"><i style=\"width:88%;background:#1c5cab\"></i></span></li><li class=\"ds-node ds-d2\"><span class=\"ds-elbow\"></span><span class=\"ds-ico ds-bad\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"failed\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/></svg></span><div class=\"ds-txt\"><span class=\"ds-name ds-failed\">Validation</span><p class=\"ds-failed\">Rejected: table not allowed</p></div><span class=\"ds-time\">3 ms</span><span class=\"ds-track\"><i style=\"width:2%;background:#b3261e\"></i></span></li></ol></section>",
+      "css": ".ds-plan { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; background: #ffffff; border: 1px solid #d5dbe2; border-radius: 5px; color: #1a1e24; } .ds-plan-cap { display: flex; justify-content: space-between; gap: 16px; padding: 10px 20px; border-bottom: 1px solid #d5dbe2; font-size: 0.875rem; font-weight: 600; } .ds-plan-cols { display: grid; grid-template-columns: 5rem 9rem; gap: 16px; font-size: 0.8125rem; font-weight: 400; color: #626b76; } .ds-plan-cols span:first-child { text-align: right; } .ds-plan ol { list-style: none; margin: 0; padding: 0 20px 12px; } .ds-node { position: relative; display: grid; grid-template-columns: 16px minmax(0,1fr) 5rem 9rem; column-gap: 8px; align-items: start; padding: 8px 0; } .ds-d1 { padding-left: 1.25rem; } .ds-d2 { padding-left: 2.5rem; } .ds-elbow { position: absolute; top: 0; height: 1.35rem; width: 0.55rem; border-left: 1px solid #b8c1cc; border-bottom: 1px solid #b8c1cc; border-bottom-left-radius: 3px; } .ds-d1 .ds-elbow { left: 0.45rem; } .ds-d2 .ds-elbow { left: 1.7rem; } .ds-ico { margin-top: 0.2rem; display: inline-flex; } .ds-good { color: #0f7a2e; } .ds-bad { color: #b3261e; } .ds-name { font: inherit; font-weight: 600; font-size: 1rem; line-height: 1.625rem; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-align: left; } .ds-name:hover, .ds-name:hover .ds-chev { color: #1c5cab; } .ds-name:focus-visible { outline: 2px solid var(--color-accent, #1c5cab); outline-offset: 2px; border-radius: 3px; } .ds-chev { vertical-align: -0.1em; color: #626b76; transition: transform 150ms; } .ds-name[aria-expanded=\"true\"] .ds-chev { transform: rotate(90deg); } .ds-txt p { margin: 2px 0 0; font-size: 0.875rem; line-height: 1.375rem; color: #505a66; } .ds-failed { color: #b3261e !important; } .ds-time { font-size: 0.875rem; color: #505a66; text-align: right; font-variant-numeric: tabular-nums; padding-top: 2px; } .ds-track, .ds-seg { display: flex; height: 6px; margin-top: 10px; margin-left: 16px; background: #edf1f5; border-radius: 9999px; overflow: hidden; } .ds-seg { gap: 2px; } .ds-seg i { flex-basis: 0; min-width: 2px; } .ds-track i { display: block; height: 100%; border-radius: 9999px; transition: width 250ms ease-out; } @media (prefers-reduced-motion: reduce) { .ds-chev, .ds-track i { transition-duration: 0.01ms; } }"
+    },
+    {
+      "name": "Error Callout",
+      "kind": "card",
+      "refersTo": "callout-bad",
+      "description": "What went wrong and what to do; also info (well) and warn (warn wash) tones.",
+      "html": "<div class=\"ds-callout\" role=\"alert\"><p class=\"ds-callout-t\">The generated SQL was rejected</p><p class=\"ds-callout-b\">Table not allowed. Nothing was run on the database.</p></div>",
+      "css": ".ds-callout { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; background: var(--color-bad-soft, #fbeceb); border: 1px solid color-mix(in srgb, #b3261e 25%, transparent); border-radius: 3px; padding: 10px 14px; } .ds-callout-t { margin: 0; font-weight: 600; color: #b3261e; } .ds-callout-b { margin: 2px 0 0; font-size: 0.875rem; line-height: 1.375rem; color: #505a66; }"
+    },
+    {
+      "name": "SQL Block",
+      "kind": "custom",
+      "refersTo": "sql-block",
+      "description": "The SQL that ran: keywords uppercase and bold, no colour highlighting.",
+      "html": "<pre class=\"ds-sql\"><code><b>SELECT</b> c.name <b>AS</b> country, e.co2 <b>FROM</b> public.co2_emissions <b>AS</b> e <b>WHERE</b> c.entity_type = <span>'country'</span> <b>LIMIT</b> 5</code></pre>",
+      "css": ".ds-sql { font-family: \"Source Code Pro\", ui-monospace, SFMono-Regular, Menlo, monospace; background: #edf1f5; color: #1a1e24; border: 1px solid #d5dbe2; border-radius: 3px; padding: 10px 12px; font-size: 0.8125rem; line-height: 1.625; white-space: pre-wrap; margin: 0; } .ds-sql b { font-weight: 600; } .ds-sql span { color: #505a66; }"
+    },
+    {
+      "name": "Result Table",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "Bordered result table: mono column names with units, tabular right-aligned numbers.",
+      "html": "<div class=\"ds-table\"><table><thead><tr><th>country</th><th class=\"n\">co2 <span>Mt</span></th></tr></thead><tbody><tr><td>China</td><td class=\"n\">12,172.009</td></tr><tr><td>United States</td><td class=\"n\">4,918.407</td></tr></tbody></table></div>",
+      "css": ".ds-table { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; display: inline-block; border: 1px solid #d5dbe2; border-radius: 3px; overflow: auto; } .ds-table table { border-collapse: collapse; font-size: 0.875rem; min-width: 16rem; } .ds-table th { font-family: \"Source Code Pro\", ui-monospace, SFMono-Regular, Menlo, monospace; background: #edf1f5; color: #505a66; font-size: 0.8125rem; font-weight: 600; text-align: left; padding: 6px 12px; border-bottom: 1px solid #d5dbe2; } .ds-table th span { font-family: \"Public Sans\", ui-sans-serif, system-ui, sans-serif; font-weight: 400; color: #626b76; margin-left: 4px; } .ds-table td { padding: 6px 12px; border-bottom: 1px solid #d5dbe2; } .ds-table tr:last-child td { border-bottom: 0; } .ds-table tbody tr:hover { background: color-mix(in srgb, #edf1f5 60%, transparent); } .ds-table .n { text-align: right; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Annotated Query Plan",
+    "overview": "The interface reads like `EXPLAIN ANALYZE` output rendered with care: a question becomes a plan tree whose root node is the answer, and every step that produced it hangs beneath, indented one column deeper, joined by elbow connectors, with its actual time in tabular numerals and a thin horizontal bar showing its share of the total. Nodes expand in place to reveal the SQL, the query plan, the validator's verdict and the checks. It is a technical document you can open up, not a chat.\n\nThe world is light only, chosen for its use scene: read in daylight, next to a code editor, by developers checking how an answer was made. A cool grey ground carries white panels outlined by hairline rules; a second, slightly bluer grey (the well) marks machine material such as SQL, table headers and loading placeholders. Colour is restrained to one plan-blue accent for actions and selection, a status triad for outcomes, and a validated data-viz palette that appears only inside charts and time bars. Density is that of a good README: compact rows, generous line height, one column no wider than 64rem.\n\nMotion exists only to report state: a chevron turns when a node opens, time bars grow once when a result lands, placeholders pulse while the plan runs. Reduced-motion preferences collapse all of it.",
+    "keyCharacteristics": [
+      "Plan-tree structure: indented rows, elbow connectors, a vertical spine, status icon column, time column, share-of-total bar column.",
+      "Light theme only; cool grey ground, white panels, hairline borders, no shadows.",
+      "Public Sans for all interface text; Source Code Pro only for SQL, identifiers and ids.",
+      "One accent (plan-blue) for actions and selection; status is always an icon plus text, never colour alone.",
+      "Fixed rem type scale (ratio about 1.2), tabular numerals for every measured value.",
+      "Charts follow the data-viz method: fixed palette order, one value axis, a table twin, units from the database's column comments."
+    ],
+    "rules": [
+      {
+        "name": "The One Pointer Rule",
+        "body": "Plan Blue marks what you can act on or what is selected, nothing else. Headings, icons and decoration never borrow it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data Owns Its Colours Rule",
+        "body": "The series palette and the time ramp appear only in charts and time bars. Interface chrome never uses a series colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Icon Plus Words Rule",
+        "body": "Status is carried by a distinct icon shape (check, alert, minus, empty ring) plus the node's text; colour reinforces, never carries alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Means Machine Rule",
+        "body": "Source Code Pro appears only for SQL, database identifiers and ids. Never for headings, numbers in prose or decoration.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Every measured value (durations, table numbers, stat answers, row counts) uses tabular numerals so columns align like plan output.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed Scale Rule",
+        "body": "Sizes come from the six rem steps; no fluid clamp() type. The page is a tool, not a poster.",
+        "section": "typography"
+      },
+      {
+        "name": "The Borders Not Shadows Rule",
+        "body": "Separation is a 1px rule or a tonal step. A box-shadow on any surface is out of system.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep Plan Blue for actions, links, focus and selection only.",
+      "**Do** pair every status with its icon shape and text; colour is the third signal, not the first.",
+      "**Do** set SQL, table and column names, model names and ids in Source Code Pro, and everything else in Public Sans.",
+      "**Do** use tabular numerals for every duration, count and result value, and right-align numeric columns.",
+      "**Do** separate with 1px hairlines and the well-grey layer.",
+      "**Do** assign chart series from the palette in slot order, keep one value axis, caption the measure with its unit from the column comment, and show the table beside or below the chart.",
+      "**Do** limit motion to state changes (chevron 150 ms, time bars 250 ms once, pulse while running) and let reduced-motion collapse it."
+    ],
+    "donts": [
+      "**Don't** add a dark theme or tinted panels; the world is light only.",
+      "**Don't** use box-shadows, gradients or blurred glass for depth.",
+      "**Don't** colour-highlight SQL; weight and case carry the keywords.",
+      "**Don't** use series or ramp colours in interface chrome.",
+      "**Don't** introduce fluid display type or sizes outside the six-step rem scale.",
+      "**Don't** present the page as a chat: no message bubbles, centred prompt boxes or sparkle icons.",
+      "**Don't** animate charts on entry or decorate with motion that reports no state."
+    ]
+  }
+}

@@ -1,0 +1,131 @@
+@import "@fontsource/public-sans/400.css";
+@import "@fontsource/public-sans/500.css";
+@import "@fontsource/public-sans/600.css";
+@import "@fontsource/public-sans/700.css";
+@import "@fontsource/source-code-pro/400.css";
+@import "@fontsource/source-code-pro/600.css";
+@import "tailwindcss";
+
+/* Design tokens. Restrained: cool neutrals, one plan-blue accent for actions and selection.
+   Chart colors come from the validated data-viz palette (series-*, ramp-*). */
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Fixed rem scale, ratio ~1.2 */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.625rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.4375rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+
+  --color-ground: #f3f5f7;
+  --color-surface: #ffffff;
+  --color-well: #edf1f5; /* second neutral layer: code, plan rows, table headers */
+  --color-ink: #1a1e24;
+  --color-ink-2: #505a66;
+  --color-ink-3: #626b76; /* >= 4.5:1 on ground, well and surface */
+  --color-rule: #d5dbe2;
+  --color-rule-strong: #b8c1cc;
+
+  --color-accent: #1c5cab;
+  --color-accent-hover: #184f95;
+  --color-accent-soft: #e3edfb;
+
+  --color-good: #0f7a2e;
+  --color-warn: #8a5a00;
+  --color-bad: #b3261e;
+  --color-bad-soft: #fbeceb;
+  --color-warn-soft: #fbf2df;
+
+  /* validated categorical palette, light (data-viz reference instance) */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+  --color-series-7: #4a3aa7;
+  --color-series-8: #e34948;
+
+  /* sequential blue ramp for time bars */
+  --color-ramp-250: #86b6ef;
+  --color-ramp-400: #3987e5;
+  --color-ramp-550: #1c5cab;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+}
+
+@layer base {
+  html {
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "tnum" 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scrollbar-color: var(--color-rule-strong) var(--color-ground);
+    color-scheme: light;
+  }
+  body {
+    min-height: 100vh;
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+  input,
+  textarea,
+  select {
+    caret-color: var(--color-accent);
+  }
+  a {
+    color: var(--color-accent);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
