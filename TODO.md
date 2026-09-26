@@ -2,16 +2,15 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 11 — Evaluation framework (Milestones 3–10 done)
+Milestone 11 — Evaluation framework: built; the question suite still has to be run (needs LLM quota)
 
 Current Objective
 
-Milestone 11: rewrite EVALUATION_PLAN.md for the yearly OWID data, build the 50+ question set with
-verified ground truth (hand-written SQL run on the pinned dataset), a runner that scores by result
-(not SQL text) and reports the plan's metrics, and the safety suite. Needs an LLM budget: each
-question can take up to 4 calls (SQL, 2 repairs, answer; ANSWER_MODE=template saves one) and the free
-Gemini tier (5/min, ~20/day per model) cannot run it in one go. Never report numbers that were not
-produced by a real run. Before a public deployment still add request rate limiting (Milestone 13).
+Run the question suite (python -m evaluation.run --suite questions) and record the report in
+EVALUATION_PLAN.md's Evaluation History. On the free Gemini tier this takes daily batches resumed
+with --run-id; with billing on the key it is one run. Never record numbers that were not produced by
+a run. Then Milestone 12 (frontend). Before a public deployment still add request rate limiting
+(Milestone 13).
 
 ⸻
 
@@ -162,6 +161,22 @@ Milestone 10 — Execution trace + structured logging + request IDs
       filtering, and an end-to-end query whose logs share one request ID and contain none of the
       question, SQL, result values, database password or URL
 Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safety suite)
+
+* [x] EVALUATION_PLAN.md rewritten for the yearly OWID data (categories, interpretation rules,
+      scoring, metrics, how to run, LLM budget)
+* [x] 73 questions (evaluation/questions.json): 10 each simple filtering, aggregation, ranking,
+      time series, multi-condition; 5 joins, 5 ambiguous (clarify), 5 no-result (empty), 8 safety
+* [x] Ground truth: hand-written SQL run on the pinned data (evaluation/expected.json, reviewed);
+      records dataset commit and row counts; two questions accept a second defensible reading
+* [x] Result-based scoring (evaluation/scoring.py): columns matched by value, row alignment,
+      order only when asked, numeric tolerance and rounding; clarify / empty / refuse / blocked
+* [x] Resumable runner (evaluation/run.py): JSONL per question, provider failures = not run, stops
+      after 3 in a row, pacing, database row counts checked before and after, secrets scanned
+* [x] Report (evaluation/report.py): all plan metrics, per category, PARTIAL when incomplete
+* [x] Offline SQL safety suite: 28 adversarial statements through validator + database, no LLM
+* [x] Tests: 51 (scoring rules, every ground truth scores as correct against itself, runner resume /
+      quota stop / pacing / integrity, report)
+* [ ] Run the question suite with a real LLM and record it (blocked on quota)
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
   * Use the `frontend-design` plugin (Anthropic directory) and impeccable.style design guidance
 Milestone 13 — Tests, Docker, README, Vercel deployment, polish

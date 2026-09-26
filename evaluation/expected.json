@@ -1,0 +1,1137 @@
+{
+ "built_at": "2026-09-26T13:45:02+00:00",
+ "dataset_commit": "382ee6c662b0ece26e111f263b44c029afad7787",
+ "row_counts": {
+  "countries": 242,
+  "country_indicators": 41243,
+  "co2_emissions": 45950,
+  "ghg_emissions": 41458
+ },
+ "results": {
+  "Q001": [
+   {
+    "columns": [
+     "co2"
+    ],
+    "rows": [
+     [
+      2422.732
+     ]
+    ]
+   }
+  ],
+  "Q002": [
+   {
+    "columns": [
+     "population"
+    ],
+    "rows": [
+     [
+      193701931
+     ]
+    ]
+   }
+  ],
+  "Q003": [
+   {
+    "columns": [
+     "co2"
+    ],
+    "rows": [
+     [
+      35403.527
+     ]
+    ]
+   }
+  ],
+  "Q004": [
+   {
+    "columns": [
+     "co2_per_capita"
+    ],
+    "rows": [
+     [
+      7.942
+     ]
+    ]
+   }
+  ],
+  "Q005": [
+   {
+    "columns": [
+     "methane"
+    ],
+    "rows": [
+     [
+      761.174
+     ]
+    ]
+   }
+  ],
+  "Q006": [
+   {
+    "columns": [
+     "coal_co2"
+    ],
+    "rows": [
+     [
+      427.648
+     ]
+    ]
+   }
+  ],
+  "Q007": [
+   {
+    "columns": [
+     "share_global_co2"
+    ],
+    "rows": [
+     [
+      31.953
+     ]
+    ]
+   }
+  ],
+  "Q008": [
+   {
+    "columns": [
+     "gdp"
+    ],
+    "rows": [
+     [
+      2596599107835
+     ]
+    ]
+   }
+  ],
+  "Q009": [
+   {
+    "columns": [
+     "cumulative_co2"
+    ],
+    "rows": [
+     [
+      78805.227
+     ]
+    ]
+   }
+  ],
+  "Q010": [
+   {
+    "columns": [
+     "co2"
+    ],
+    "rows": [
+     [
+      5265.446
+     ]
+    ]
+   }
+  ],
+  "Q011": [
+   {
+    "columns": [
+     "avg"
+    ],
+    "rows": [
+     [
+      4.503855140186916
+     ]
+    ]
+   }
+  ],
+  "Q012": [
+   {
+    "columns": [
+     "count"
+    ],
+    "rows": [
+     [
+      42
+     ]
+    ]
+   }
+  ],
+  "Q013": [
+   {
+    "columns": [
+     "sum"
+    ],
+    "rows": [
+     [
+      36562.105
+     ]
+    ]
+   },
+   {
+    "columns": [
+     "co2"
+    ],
+    "rows": [
+     [
+      37527.773
+     ]
+    ]
+   }
+  ],
+  "Q014": [
+   {
+    "columns": [
+     "max"
+    ],
+    "rows": [
+     [
+      37.082
+     ]
+    ]
+   }
+  ],
+  "Q015": [
+   {
+    "columns": [
+     "min"
+    ],
+    "rows": [
+     [
+      501
+     ]
+    ]
+   }
+  ],
+  "Q016": [
+   {
+    "columns": [
+     "count"
+    ],
+    "rows": [
+     [
+      219
+     ]
+    ]
+   }
+  ],
+  "Q017": [
+   {
+    "columns": [
+     "avg"
+    ],
+    "rows": [
+     [
+      2195.8011818181817
+     ]
+    ]
+   }
+  ],
+  "Q018": [
+   {
+    "columns": [
+     "sum"
+    ],
+    "rows": [
+     [
+      59691.62
+     ]
+    ]
+   }
+  ],
+  "Q019": [
+   {
+    "columns": [
+     "count"
+    ],
+    "rows": [
+     [
+      8
+     ]
+    ]
+   }
+  ],
+  "Q020": [
+   {
+    "columns": [
+     "percentile_cont"
+    ],
+    "rows": [
+     [
+      3.162
+     ]
+    ]
+   }
+  ],
+  "Q021": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "China"
+     ],
+     [
+      "United States"
+     ],
+     [
+      "India"
+     ],
+     [
+      "Russia"
+     ],
+     [
+      "Japan"
+     ]
+    ]
+   }
+  ],
+  "Q022": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Qatar"
+     ],
+     [
+      "Brunei"
+     ],
+     [
+      "Kuwait"
+     ]
+    ]
+   }
+  ],
+  "Q023": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Democratic Republic of Congo"
+     ],
+     [
+      "Burundi"
+     ],
+     [
+      "Somalia"
+     ],
+     [
+      "Central African Republic"
+     ],
+     [
+      "Malawi"
+     ]
+    ]
+   }
+  ],
+  "Q024": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "India"
+     ]
+    ]
+   }
+  ],
+  "Q025": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "China"
+     ],
+     [
+      "India"
+     ],
+     [
+      "United States"
+     ],
+     [
+      "Brazil"
+     ],
+     [
+      "Russia"
+     ]
+    ]
+   }
+  ],
+  "Q026": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "United States"
+     ],
+     [
+      "China"
+     ],
+     [
+      "Russia"
+     ],
+     [
+      "Germany"
+     ],
+     [
+      "United Kingdom"
+     ],
+     [
+      "Japan"
+     ],
+     [
+      "India"
+     ],
+     [
+      "France"
+     ],
+     [
+      "Canada"
+     ],
+     [
+      "Ukraine"
+     ]
+    ]
+   }
+  ],
+  "Q027": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "United States"
+     ],
+     [
+      "China"
+     ],
+     [
+      "India"
+     ]
+    ]
+   }
+  ],
+  "Q028": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Asia"
+     ]
+    ]
+   }
+  ],
+  "Q029": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "China"
+     ],
+     [
+      "United States"
+     ],
+     [
+      "India"
+     ],
+     [
+      "Japan"
+     ],
+     [
+      "Germany"
+     ]
+    ]
+   }
+  ],
+  "Q030": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "High-income countries"
+     ],
+     [
+      "Upper-middle-income countries"
+     ],
+     [
+      "Lower-middle-income countries"
+     ],
+     [
+      "Low-income countries"
+     ]
+    ]
+   }
+  ],
+  "Q031": [
+   {
+    "columns": [
+     "year",
+     "co2"
+    ],
+    "rows": [
+     [
+      2015,
+      2231.817
+     ],
+     [
+      2016,
+      2352.54
+     ],
+     [
+      2017,
+      2425.722
+     ],
+     [
+      2018,
+      2595.227
+     ],
+     [
+      2019,
+      2611.175
+     ],
+     [
+      2020,
+      2422.732
+     ]
+    ]
+   }
+  ],
+  "Q032": [
+   {
+    "columns": [
+     "year",
+     "co2_per_capita"
+    ],
+    "rows": [
+     [
+      2000,
+      2.87
+     ],
+     [
+      2001,
+      2.912
+     ],
+     [
+      2002,
+      3.185
+     ],
+     [
+      2003,
+      3.735
+     ],
+     [
+      2004,
+      4.002
+     ],
+     [
+      2005,
+      4.49
+     ],
+     [
+      2006,
+      4.921
+     ],
+     [
+      2007,
+      5.261
+     ],
+     [
+      2008,
+      5.617
+     ],
+     [
+      2009,
+      5.871
+     ],
+     [
+      2010,
+      6.37
+     ]
+    ]
+   }
+  ],
+  "Q033": [
+   {
+    "columns": [
+     "year",
+     "co2"
+    ],
+    "rows": [
+     [
+      2019,
+      37086.566
+     ],
+     [
+      2020,
+      35158.23
+     ],
+     [
+      2021,
+      36866.863
+     ],
+     [
+      2022,
+      37527.773
+     ],
+     [
+      2023,
+      38094.039
+     ]
+    ]
+   }
+  ],
+  "Q034": [
+   {
+    "columns": [
+     "year",
+     "coal_co2"
+    ],
+    "rows": [
+     [
+      2010,
+      118.03
+     ],
+     [
+      2011,
+      117.15
+     ],
+     [
+      2012,
+      148.005
+     ],
+     [
+      2013,
+      142.457
+     ],
+     [
+      2014,
+      115.434
+     ],
+     [
+      2015,
+      91.548
+     ],
+     [
+      2016,
+      47.825
+     ],
+     [
+      2017,
+      39.129
+     ],
+     [
+      2018,
+      33.28
+     ],
+     [
+      2019,
+      24.513
+     ],
+     [
+      2020,
+      22.809
+     ]
+    ]
+   }
+  ],
+  "Q035": [
+   {
+    "columns": [
+     "year"
+    ],
+    "rows": [
+     [
+      2005
+     ]
+    ]
+   }
+  ],
+  "Q036": [
+   {
+    "columns": [
+     "year",
+     "population"
+    ],
+    "rows": [
+     [
+      1990,
+      79707963
+     ],
+     [
+      2000,
+      81797255
+     ],
+     [
+      2010,
+      80830916
+     ],
+     [
+      2020,
+      83628711
+     ]
+    ]
+   }
+  ],
+  "Q037": [
+   {
+    "columns": [
+     "?column?"
+    ],
+    "rows": [
+     [
+      7252.711
+     ]
+    ]
+   }
+  ],
+  "Q038": [
+   {
+    "columns": [
+     "co2_growth_prct"
+    ],
+    "rows": [
+     [
+      1.509
+     ]
+    ]
+   }
+  ],
+  "Q039": [
+   {
+    "columns": [
+     "year"
+    ],
+    "rows": [
+     [
+      2024
+     ]
+    ]
+   }
+  ],
+  "Q040": [
+   {
+    "columns": [
+     "year",
+     "co2_per_capita"
+    ],
+    "rows": [
+     [
+      1990,
+      6.929
+     ],
+     [
+      1995,
+      6.65
+     ],
+     [
+      2000,
+      6.85
+     ],
+     [
+      2005,
+      6.756
+     ],
+     [
+      2010,
+      5.946
+     ],
+     [
+      2015,
+      5.116
+     ],
+     [
+      2020,
+      4.272
+     ]
+    ]
+   }
+  ],
+  "Q041": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Saudi Arabia"
+     ],
+     [
+      "United Arab Emirates"
+     ]
+    ]
+   }
+  ],
+  "Q042": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "China"
+     ],
+     [
+      "India"
+     ],
+     [
+      "United States"
+     ]
+    ]
+   }
+  ],
+  "Q043": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Brazil"
+     ],
+     [
+      "Canada"
+     ],
+     [
+      "Mexico"
+     ],
+     [
+      "South Africa"
+     ],
+     [
+      "Turkey"
+     ]
+    ]
+   }
+  ],
+  "Q044": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Algeria"
+     ],
+     [
+      "Argentina"
+     ],
+     [
+      "Bangladesh"
+     ],
+     [
+      "Iran"
+     ],
+     [
+      "Malaysia"
+     ],
+     [
+      "Netherlands"
+     ],
+     [
+      "Qatar"
+     ],
+     [
+      "Russia"
+     ],
+     [
+      "Taiwan"
+     ],
+     [
+      "Turkmenistan"
+     ],
+     [
+      "Ukraine"
+     ],
+     [
+      "United Arab Emirates"
+     ],
+     [
+      "Uzbekistan"
+     ]
+    ]
+   }
+  ],
+  "Q045": [
+   {
+    "columns": [
+     "count"
+    ],
+    "rows": [
+     [
+      58
+     ]
+    ]
+   }
+  ],
+  "Q046": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Democratic Republic of Congo"
+     ],
+     [
+      "Ethiopia"
+     ],
+     [
+      "Nigeria"
+     ],
+     [
+      "Bangladesh"
+     ],
+     [
+      "Pakistan"
+     ]
+    ]
+   }
+  ],
+  "Q047": [
+   {
+    "columns": [
+     "avg"
+    ],
+    "rows": [
+     [
+      4.158620689655172
+     ]
+    ]
+   },
+   {
+    "columns": [
+     "?column?"
+    ],
+    "rows": [
+     [
+      4.554194063144539
+     ]
+    ]
+   }
+  ],
+  "Q048": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Indonesia"
+     ],
+     [
+      "Iraq"
+     ],
+     [
+      "Kazakhstan"
+     ],
+     [
+      "Kuwait"
+     ],
+     [
+      "Turkmenistan"
+     ],
+     [
+      "Venezuela"
+     ]
+    ]
+   }
+  ],
+  "Q049": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Brazil"
+     ],
+     [
+      "China"
+     ],
+     [
+      "India"
+     ],
+     [
+      "Russia"
+     ],
+     [
+      "United States"
+     ]
+    ]
+   }
+  ],
+  "Q050": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "Upper-middle-income countries"
+     ]
+    ]
+   }
+  ],
+  "Q051": [
+   {
+    "columns": [
+     "name",
+     "co2"
+    ],
+    "rows": [
+     [
+      "China",
+      10896.521
+     ],
+     [
+      "United States",
+      4689.954
+     ],
+     [
+      "India",
+      2422.732
+     ],
+     [
+      "Japan",
+      1037.285
+     ],
+     [
+      "Germany",
+      647.177
+     ]
+    ]
+   }
+  ],
+  "Q052": [
+   {
+    "columns": [
+     "name",
+     "total_ghg"
+    ],
+    "rows": [
+     [
+      "India",
+      3869.995
+     ],
+     [
+      "China",
+      13446.92
+     ],
+     [
+      "United States",
+      6201.504
+     ],
+     [
+      "Indonesia",
+      1812.192
+     ],
+     [
+      "Pakistan",
+      489.885
+     ]
+    ]
+   }
+  ],
+  "Q053": [
+   {
+    "columns": [
+     "co2",
+     "methane"
+    ],
+    "rows": [
+     [
+      2422.732,
+      807.835
+     ]
+    ]
+   }
+  ],
+  "Q054": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": [
+     [
+      "China"
+     ],
+     [
+      "India"
+     ],
+     [
+      "Russia"
+     ],
+     [
+      "United States"
+     ]
+    ]
+   }
+  ],
+  "Q055": [
+   {
+    "columns": [
+     "energy_per_capita",
+     "co2_per_capita"
+    ],
+    "rows": [
+     [
+      31235.707,
+      8.218
+     ]
+    ]
+   }
+  ],
+  "Q061": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": []
+   }
+  ],
+  "Q062": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": []
+   }
+  ],
+  "Q063": [
+   {
+    "columns": [
+     "co2"
+    ],
+    "rows": []
+   }
+  ],
+  "Q064": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": []
+   }
+  ],
+  "Q065": [
+   {
+    "columns": [
+     "name"
+    ],
+    "rows": []
+   }
+  ]
+ }
+}
