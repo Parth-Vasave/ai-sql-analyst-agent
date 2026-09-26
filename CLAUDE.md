@@ -171,6 +171,10 @@ Make logical commits when appropriate.
 
 Commit messages should clearly describe the change.
 
+Authorship: commits are authored and committed by the repository owner's account only
+(parth <mailparthvasave@gmail.com>). Do not add Co-Authored-By, Claude-Session or any other
+attribution trailers to commit messages.
+
 Never commit:
 
 * .env
