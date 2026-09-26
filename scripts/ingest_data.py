@@ -1,168 +1,100 @@
-"""Download mandi price records from the data.gov.in Open Government Data API.
+"""Download the Our World in Data CO2 dataset and codebook into data/raw/.
 
-This is one of two ways to get raw data into ``data/raw/``:
-
-1. This script (needs a free data.gov.in API key), or
-2. A CSV downloaded manually from data.gov.in / AGMARKNET and copied into ``data/raw/``.
-
-Either way, ``clean_data.py`` does the rest. Every download writes a manifest next to the
-CSV recording where and when the data came from, so the dataset stays traceable.
+The files are fetched from a pinned commit of https://github.com/owid/co2-data and
+verified against known SHA-256 hashes, so every build uses exactly the same data.
+A manifest recording the source, commit, download time and hashes is written alongside.
 
 Usage:
-    DATA_GOV_IN_API_KEY=... python -m scripts.ingest_data --dataset historical \\
-        --filter Commodity=Wheat --filter State=Maharashtra --max-records 50000
+    python -m scripts.ingest_data                     # pinned commit (reproducible)
+    python -m scripts.ingest_data --commit master --no-verify   # latest data, unverified
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import json
-import os
 import sys
 import time
-import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-API_BASE = "https://api.data.gov.in/resource"
-PAGE_SIZE = 1000
-
-# data.gov.in resource IDs. Verify on the portal before a large download: the portal
-# occasionally re-publishes resources under new IDs.
-DATASETS: dict[str, dict[str, str]] = {
-    "current": {
-        "resource_id": "9ef84268-d588-465a-a308-a864a43d0070",
-        "title": "Current Daily Price of Various Commodities from Various Markets (Mandi)",
-    },
-    "historical": {
-        "resource_id": "35985678-0d79-46b4-9ed6-6f13308a1d24",
-        "title": "Variety-wise Daily Market Prices Data of Commodity",
-    },
+REPO = "owid/co2-data"
+# OWID co2-data HEAD on 2026-09-26. Update commit and hashes together.
+PINNED_COMMIT = "382ee6c662b0ece26e111f263b44c029afad7787"
+FILES: dict[str, str] = {
+    "owid-co2-data.csv": "7f78e2b218ce4bb8c538bbec04fdc9a7982e8d40bff972e650df603899edd5f6",
+    "owid-co2-codebook.csv": "33b4f5e00efd58c7b83863f736beba1af4df946b43642b0400c3ec38648e0e8e",
 }
-
 RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
+MANIFEST_NAME = "owid-co2.manifest.json"
 
 
-def build_url(resource_id: str, api_key: str, offset: int, filters: dict[str, str]) -> str:
-    params: dict[str, str | int] = {
-        "api-key": api_key,
-        "format": "json",
-        "offset": offset,
-        "limit": PAGE_SIZE,
-    }
-    for field, value in filters.items():
-        params[f"filters[{field}]"] = value
-    return f"{API_BASE}/{resource_id}?{urllib.parse.urlencode(params)}"
+class IntegrityError(RuntimeError):
+    """Raised when a downloaded file does not match its expected hash."""
 
 
-def redact(url: str) -> str:
-    """Remove the API key from a URL before it is logged or written to disk."""
-    parts = urllib.parse.urlsplit(url)
-    query = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query) if k != "api-key"]
-    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
+def raw_url(commit: str, filename: str) -> str:
+    return f"https://raw.githubusercontent.com/{REPO}/{commit}/{filename}"
 
 
-def fetch_page(url: str, retries: int = 3) -> dict[str, Any]:
+def fetch(url: str, retries: int = 3) -> bytes:
     for attempt in range(1, retries + 1):
         try:
-            with urllib.request.urlopen(url, timeout=60) as response:
-                return json.load(response)
-        except (OSError, json.JSONDecodeError) as exc:
+            with urllib.request.urlopen(url, timeout=120) as response:
+                return response.read()
+        except OSError as exc:
             if attempt == retries:
-                raise RuntimeError(f"data.gov.in request failed after {retries} attempts: {exc}") from exc
+                raise RuntimeError(f"Download failed after {retries} attempts: {url}: {exc}") from exc
             time.sleep(2**attempt)
     raise AssertionError("unreachable")
 
 
-def download(
-    resource_id: str, api_key: str, filters: dict[str, str], max_records: int
-) -> tuple[list[dict[str, Any]], int]:
-    records: list[dict[str, Any]] = []
-    total = 0
-    offset = 0
-    while len(records) < max_records:
-        payload = fetch_page(build_url(resource_id, api_key, offset, filters))
-        if payload.get("status") == "error":
-            raise RuntimeError(f"data.gov.in returned an error: {payload.get('message')}")
-        page = payload.get("records") or []
-        total = int(payload.get("total") or 0)
-        if not page:
-            break
-        records.extend(page)
-        offset += len(page)
-        print(f"  fetched {len(records):,} / {min(total, max_records):,}", file=sys.stderr)
-        if offset >= total:
-            break
-    return records[:max_records], total
-
-
-def write_outputs(
-    records: list[dict[str, Any]], dataset: str, resource_id: str, filters: dict[str, str], total: int
-) -> Path:
-    if not records:
-        raise RuntimeError("No records returned; check the filters and the resource ID.")
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    csv_path = RAW_DIR / f"datagovin_{dataset}_{stamp}.csv"
-
-    fieldnames = list(records[0].keys())
-    with csv_path.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(records)
+def download(commit: str, verify: bool, raw_dir: Path = RAW_DIR) -> dict:
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    files = []
+    for filename, expected in FILES.items():
+        url = raw_url(commit, filename)
+        print(f"Downloading {url}", file=sys.stderr)
+        content = fetch(url)
+        digest = hashlib.sha256(content).hexdigest()
+        if verify and digest != expected:
+            raise IntegrityError(
+                f"{filename}: sha256 {digest} does not match the pinned {expected}. "
+                "Use --no-verify only if you intend to use different data."
+            )
+        (raw_dir / filename).write_bytes(content)
+        files.append({"file": filename, "url": url, "sha256": digest, "bytes": len(content)})
 
     manifest = {
-        "source": "data.gov.in Open Government Data Platform (AGMARKNET)",
-        "dataset_title": DATASETS.get(dataset, {}).get("title", dataset),
-        "resource_id": resource_id,
-        "resource_url": f"https://data.gov.in/resource/{resource_id}",
-        "api_request": redact(build_url(resource_id, "REDACTED", 0, filters)),
-        "filters": filters,
+        "source": "Our World in Data — CO2 and Greenhouse Gas Emissions",
+        "repository": f"https://github.com/{REPO}",
+        "commit": commit,
+        "license": "CC BY 4.0",
         "downloaded_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "records_available": total,
-        "records_downloaded": len(records),
-        "columns": fieldnames,
-        "sha256": hashlib.sha256(csv_path.read_bytes()).hexdigest(),
+        "verified_against_pinned_hashes": verify,
+        "files": files,
     }
-    csv_path.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    return csv_path
-
-
-def parse_filters(values: list[str]) -> dict[str, str]:
-    filters: dict[str, str] = {}
-    for item in values:
-        field, sep, value = item.partition("=")
-        if not sep or not field or not value:
-            raise SystemExit(f"Invalid --filter {item!r}; expected Field=Value")
-        filters[field] = value
-    return filters
+    (raw_dir / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--dataset", choices=sorted(DATASETS), default="historical")
-    parser.add_argument("--resource-id", help="Override the resource ID of --dataset.")
-    parser.add_argument("--filter", action="append", default=[], metavar="Field=Value")
-    parser.add_argument("--max-records", type=int, default=100_000)
+    parser.add_argument("--commit", default=PINNED_COMMIT, help="Git commit or branch of owid/co2-data")
+    parser.add_argument("--no-verify", action="store_true", help="Skip the pinned SHA-256 check")
+    parser.add_argument("--raw-dir", type=Path, default=RAW_DIR)
     args = parser.parse_args(argv)
 
-    api_key = os.environ.get("DATA_GOV_IN_API_KEY")
-    if not api_key:
-        print("DATA_GOV_IN_API_KEY is not set. Register at https://data.gov.in to get one.", file=sys.stderr)
-        return 2
-
-    resource_id = args.resource_id or DATASETS[args.dataset]["resource_id"]
-    filters = parse_filters(args.filter)
-    print(f"Downloading resource {resource_id} with filters {filters or '{}'}", file=sys.stderr)
-    records, total = download(resource_id, api_key, filters, args.max_records)
-    path = write_outputs(records, args.dataset, resource_id, filters, total)
-    print(f"Wrote {len(records):,} records to {path}")
+    try:
+        manifest = download(args.commit, verify=not args.no_verify, raw_dir=args.raw_dir)
+    except (IntegrityError, RuntimeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"Wrote {len(manifest['files'])} files and {MANIFEST_NAME} to {args.raw_dir}")
     return 0
 
 

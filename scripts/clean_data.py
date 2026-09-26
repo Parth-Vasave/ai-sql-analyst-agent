@@ -1,27 +1,26 @@
-"""Clean raw mandi price CSVs into one normalized, validated CSV.
+"""Clean the OWID CO2 dataset and split it into the tables of database/schema.sql.
 
-Accepts the column layouts published by data.gov.in (API and portal downloads) and
-AGMARKNET exports, e.g. ``Min_x0020_Price``, ``Min Price (Rs./Quintal)`` or ``min_price``.
+Rules, in the order applied (every change is counted in cleaning_report.json):
 
-Every rule that drops rows is counted in ``cleaning_report.json`` so the preprocessing
-is auditable. Rules, in the order applied:
-
-1.  Column names are normalized and mapped to canonical names; missing required
-    columns abort with an error.
-2.  Text is trimmed and inner whitespace collapsed. Casing is left as published.
-3.  Missing variety / grade become 'Unknown' (they are descriptive, not identifying).
-4.  Rows missing state, district, market or commodity are dropped.
-5.  Dates are parsed as day-first (dd/mm/yyyy, the data.gov.in format) or ISO
-    (yyyy-mm-dd). Unparseable dates are dropped. Month-first is never guessed.
-6.  Prices must be numeric and > 0; min <= max; min <= modal <= max. Others are dropped.
-7.  Optional --start-date / --end-date / --commodity filters (not counted as errors).
-8.  Exact duplicate rows are collapsed to one.
-9.  Rows sharing the natural key (state, district, market, commodity, variety, grade,
-    date) but with different prices are all dropped: there is no way to tell which is right.
+1.  All columns the schema needs must be present, or the run aborts.
+2.  Entity names are trimmed; ISO codes are upper-cased and must be 3 letters.
+3.  Entities suffixed "(GCP)" are excluded. They are the Global Carbon Project's
+    alternative region definitions and duplicate OWID's own regions (e.g. "Asia" vs
+    "Asia (GCP)"), which would make questions about regions ambiguous.
+4.  Every remaining entity is classified as country / region / income_group / other.
+    Entities with an ISO code are countries (plus Kosovo, which has none in OWID).
+    Aggregates are matched against explicit lists below; an unknown entity without an
+    ISO code aborts the run, so new OWID aggregates are never silently mislabeled.
+5.  A duplicate (entity, year) aborts the run: the source guarantees uniqueness.
+6.  Negative values in columns that cannot be negative (see NON_NEGATIVE) are set to
+    NULL and counted. Columns that legitimately go negative (land-use change, trade,
+    growth, total GHG including land use) are left as published.
+7.  Each table receives only the (entity, year) rows where at least one of its
+    metrics is present, so tables contain no all-NULL rows.
 
 Usage:
-    python -m scripts.clean_data data/raw/*.csv
-    python -m scripts.clean_data data/raw/*.csv --start-date 2022-01-01 --commodity Wheat
+    python -m scripts.clean_data                           # data/raw/owid-co2-data.csv
+    python -m scripts.clean_data path/to/owid-co2-data.csv --output-dir data/processed
 """
 
 from __future__ import annotations
@@ -29,227 +28,243 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-PROCESSED_DIR = Path(__file__).resolve().parent.parent / "data" / "processed"
-OUTPUT_NAME = "daily_prices_clean.csv"
+ROOT = Path(__file__).resolve().parent.parent
+RAW_FILE = ROOT / "data" / "raw" / "owid-co2-data.csv"
+PROCESSED_DIR = ROOT / "data" / "processed"
 REPORT_NAME = "cleaning_report.json"
+COUNTRIES_FILE = "countries.csv"
 
-TEXT_COLUMNS = ["state", "district", "market", "commodity", "variety", "grade"]
-PRICE_COLUMNS = ["min_price", "max_price", "modal_price"]
-OUTPUT_COLUMNS = [*TEXT_COLUMNS, "arrival_date", *PRICE_COLUMNS]
-REQUIRED_COLUMNS = ["state", "district", "market", "commodity", "arrival_date", *PRICE_COLUMNS]
-KEY_COLUMNS = [*TEXT_COLUMNS, "arrival_date"]
-UNKNOWN = "Unknown"
-
-# Normalized source header -> canonical column.
-COLUMN_ALIASES: dict[str, str] = {
-    "state": "state",
-    "state_name": "state",
-    "district": "district",
-    "district_name": "district",
-    "market": "market",
-    "market_name": "market",
-    "commodity": "commodity",
-    "commodity_name": "commodity",
-    "variety": "variety",
-    "grade": "grade",
-    "arrival_date": "arrival_date",
-    "price_date": "arrival_date",
-    "reported_date": "arrival_date",
-    "min_price": "min_price",
-    "min_price_rs_quintal": "min_price",
-    "max_price": "max_price",
-    "max_price_rs_quintal": "max_price",
-    "modal_price": "modal_price",
-    "modal_price_rs_quintal": "modal_price",
+TABLE_COLUMNS: dict[str, list[str]] = {
+    "country_indicators": [
+        "population",
+        "gdp",
+        "primary_energy_consumption",
+        "energy_per_capita",
+        "energy_per_gdp",
+    ],
+    "co2_emissions": [
+        "co2",
+        "co2_per_capita",
+        "co2_per_gdp",
+        "co2_per_unit_energy",
+        "co2_growth_abs",
+        "co2_growth_prct",
+        "coal_co2",
+        "oil_co2",
+        "gas_co2",
+        "cement_co2",
+        "flaring_co2",
+        "other_industry_co2",
+        "coal_co2_per_capita",
+        "oil_co2_per_capita",
+        "gas_co2_per_capita",
+        "land_use_change_co2",
+        "co2_including_luc",
+        "co2_including_luc_per_capita",
+        "consumption_co2",
+        "consumption_co2_per_capita",
+        "trade_co2",
+        "trade_co2_share",
+        "cumulative_co2",
+        "share_global_co2",
+        "share_global_cumulative_co2",
+    ],
+    "ghg_emissions": [
+        "methane",
+        "methane_per_capita",
+        "nitrous_oxide",
+        "nitrous_oxide_per_capita",
+        "total_ghg",
+        "total_ghg_excluding_lucf",
+        "ghg_per_capita",
+        "ghg_excluding_lucf_per_capita",
+        "temperature_change_from_ghg",
+        "temperature_change_from_co2",
+        "temperature_change_from_ch4",
+        "temperature_change_from_n2o",
+        "share_of_temperature_change_from_ghg",
+    ],
 }
 
-DATE_FORMATS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d-%b-%Y", "%d %b %Y"]
+# Must mirror the CHECK (... >= 0) constraints in database/schema.sql.
+NON_NEGATIVE = {
+    "population",
+    "gdp",
+    "primary_energy_consumption",
+    "energy_per_capita",
+    "energy_per_gdp",
+    "co2",
+    "co2_per_capita",
+    "co2_per_gdp",
+    "co2_per_unit_energy",
+    "coal_co2",
+    "oil_co2",
+    "gas_co2",
+    "cement_co2",
+    "flaring_co2",
+    "other_industry_co2",
+    "coal_co2_per_capita",
+    "oil_co2_per_capita",
+    "gas_co2_per_capita",
+    "consumption_co2",
+    "consumption_co2_per_capita",
+    "cumulative_co2",
+    "methane",
+    "methane_per_capita",
+    "nitrous_oxide",
+    "nitrous_oxide_per_capita",
+}
+
+REGIONS = {
+    "World",
+    "Africa",
+    "Asia",
+    "Asia (excl. China and India)",
+    "Europe",
+    "Europe (excl. EU-27)",
+    "Europe (excl. EU-28)",
+    "European Union (27)",
+    "European Union (28)",
+    "North America",
+    "North America (excl. USA)",
+    "Oceania",
+    "South America",
+    "OECD (Jones et al.)",
+    "Least developed countries (Jones et al.)",
+}
+INCOME_GROUPS = {
+    "High-income countries",
+    "Upper-middle-income countries",
+    "Lower-middle-income countries",
+    "Low-income countries",
+}
+OTHER_ENTITIES = {"International aviation", "International shipping", "Kuwaiti Oil Fires", "Ryukyu Islands"}
+COUNTRIES_WITHOUT_ISO = {"Kosovo"}
+EXCLUDED_SUFFIX = " (GCP)"
+
+ENTITY_COLUMNS = ["country", "year", "iso_code"]
+REQUIRED_COLUMNS = ENTITY_COLUMNS + [c for cols in TABLE_COLUMNS.values() for c in cols]
 
 
 class CleaningError(ValueError):
-    """Raised when an input file cannot be cleaned at all (e.g. missing columns)."""
+    """Raised when the input cannot be cleaned safely."""
 
 
 @dataclass
 class CleaningReport:
-    input_files: list[dict[str, Any]] = field(default_factory=list)
+    input_file: dict[str, Any] = field(default_factory=dict)
     rows_read: int = 0
-    dropped: dict[str, int] = field(default_factory=dict)
-    filtered: dict[str, int] = field(default_factory=dict)
-    filled_unknown: dict[str, int] = field(default_factory=dict)
-    rows_written: int = 0
+    excluded_entities: list[str] = field(default_factory=list)
+    rows_excluded: int = 0
+    entities_by_type: dict[str, int] = field(default_factory=dict)
+    negative_values_nulled: dict[str, int] = field(default_factory=dict)
+    rows_written: dict[str, int] = field(default_factory=dict)
+    unused_source_columns: list[str] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-            "input_files": self.input_files,
-            "rows_read": self.rows_read,
-            "rows_dropped": self.dropped,
-            "rows_filtered": self.filtered,
-            "values_filled_with_unknown": self.filled_unknown,
-            "rows_written": self.rows_written,
-            "summary": self.summary,
-        }
+        return {"generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"), **self.__dict__}
 
 
-def normalize_header(name: str) -> str:
-    name = name.replace("_x0020_", "_").strip().lower()
-    return re.sub(r"[^a-z0-9]+", "_", name).strip("_")
+def classify_entity(name: str, iso_code: object) -> str:
+    if pd.notna(iso_code) or name in COUNTRIES_WITHOUT_ISO:
+        return "country"
+    if name in REGIONS:
+        return "region"
+    if name in INCOME_GROUPS:
+        return "income_group"
+    if name in OTHER_ENTITIES:
+        return "other"
+    raise CleaningError(
+        f"Unclassified entity without ISO code: {name!r}. Add it to the entity lists in clean_data.py."
+    )
 
 
-def canonicalize_columns(df: pd.DataFrame, source: str) -> pd.DataFrame:
-    mapping: dict[str, str] = {}
-    for column in df.columns:
-        canonical = COLUMN_ALIASES.get(normalize_header(str(column)))
-        if canonical and canonical not in mapping.values():
-            mapping[column] = canonical
-    df = df.rename(columns=mapping)
+def clean(df: pd.DataFrame, report: CleaningReport) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
-        raise CleaningError(
-            f"{source}: missing required column(s) {missing}. Found: {list(map(str, df.columns))}"
-        )
-    for optional in ("variety", "grade"):
-        if optional not in df.columns:
-            df[optional] = pd.NA
-    return df[OUTPUT_COLUMNS]
+        raise CleaningError(f"Missing required column(s): {missing}")
+    report.rows_read = len(df)
+    report.unused_source_columns = sorted(set(df.columns) - set(REQUIRED_COLUMNS))
+    df = df[REQUIRED_COLUMNS].copy()
 
+    df["country"] = df["country"].astype("string").str.strip()
+    df["iso_code"] = df["iso_code"].astype("string").str.strip().str.upper().replace("", pd.NA)
+    bad_iso = df["iso_code"].notna() & ~df["iso_code"].str.fullmatch(r"[A-Z]{3}", na=False)
+    if bad_iso.any():
+        raise CleaningError(f"Invalid ISO codes: {sorted(df.loc[bad_iso, 'iso_code'].unique())}")
 
-def parse_dates(values: pd.Series) -> pd.Series:
-    text = values.astype("string").str.strip()
-    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
-    for fmt in DATE_FORMATS:
-        attempt = pd.to_datetime(text, format=fmt, errors="coerce")
-        parsed = parsed.fillna(attempt)
-    return parsed
+    excluded = df["country"].str.endswith(EXCLUDED_SUFFIX, na=False)
+    report.excluded_entities = sorted(df.loc[excluded, "country"].unique())
+    report.rows_excluded = int(excluded.sum())
+    df = df.loc[~excluded]
 
+    if df["country"].isna().any() or df["year"].isna().any():
+        raise CleaningError("Rows with a missing entity name or year")
+    df["year"] = df["year"].astype(int)
+    duplicates = df.duplicated(["country", "year"], keep=False)
+    if duplicates.any():
+        sample = df.loc[duplicates, ["country", "year"]].head(5).to_dict("records")
+        raise CleaningError(f"Duplicate (country, year) rows, e.g. {sample}")
 
-def parse_prices(values: pd.Series) -> pd.Series:
-    text = values.astype("string").str.replace(",", "", regex=False).str.strip()
-    return pd.to_numeric(text, errors="coerce")
+    entities = df.groupby("country", sort=True)["iso_code"].first()  # first non-null code
+    countries = pd.DataFrame({"name": entities.index, "iso_code": entities.values})
+    countries["entity_type"] = [
+        classify_entity(n, i) for n, i in zip(countries["name"], countries["iso_code"], strict=True)
+    ]
+    report.entities_by_type = countries["entity_type"].value_counts().sort_index().to_dict()
 
+    for column in sorted(NON_NEGATIVE):
+        negative = df[column] < 0
+        if negative.any():
+            report.negative_values_nulled[column] = int(negative.sum())
+            df.loc[negative, column] = pd.NA
 
-def _drop(df: pd.DataFrame, mask: pd.Series, reason: str, report: CleaningReport) -> pd.DataFrame:
-    count = int(mask.sum())
-    report.dropped[reason] = report.dropped.get(reason, 0) + count
-    return df.loc[~mask]
+    df["population"] = df["population"].round().astype("Int64")
 
+    tables: dict[str, pd.DataFrame] = {}
+    for table, columns in TABLE_COLUMNS.items():
+        part = df.loc[df[columns].notna().any(axis=1), ["country", "year", *columns]]
+        tables[table] = part.sort_values(["country", "year"]).reset_index(drop=True)
+        report.rows_written[table] = len(part)
 
-def clean_frame(
-    df: pd.DataFrame,
-    report: CleaningReport,
-    start_date: date | None = None,
-    end_date: date | None = None,
-    commodities: list[str] | None = None,
-) -> pd.DataFrame:
-    df = df.copy()
-    for column in TEXT_COLUMNS:
-        df[column] = df[column].astype("string").str.strip().str.replace(r"\s+", " ", regex=True)
-        df.loc[df[column] == "", column] = pd.NA
-
-    for column in ("variety", "grade"):
-        missing = df[column].isna()
-        report.filled_unknown[column] = report.filled_unknown.get(column, 0) + int(missing.sum())
-        df.loc[missing, column] = UNKNOWN
-
-    df = _drop(
-        df,
-        df[["state", "district", "market", "commodity"]].isna().any(axis=1),
-        "missing_location_or_commodity",
-        report,
-    )
-
-    df["arrival_date"] = parse_dates(df["arrival_date"])
-    df = _drop(df, df["arrival_date"].isna(), "invalid_date", report)
-
-    for column in PRICE_COLUMNS:
-        df[column] = parse_prices(df[column])
-    df = _drop(df, df[PRICE_COLUMNS].isna().any(axis=1), "non_numeric_price", report)
-    df = _drop(df, (df[PRICE_COLUMNS] <= 0).any(axis=1), "non_positive_price", report)
-    df = _drop(df, df["min_price"] > df["max_price"], "min_price_above_max_price", report)
-    df = _drop(
-        df,
-        (df["modal_price"] < df["min_price"]) | (df["modal_price"] > df["max_price"]),
-        "modal_price_outside_min_max",
-        report,
-    )
-
-    if start_date:
-        mask = df["arrival_date"] < pd.Timestamp(start_date)
-        report.filtered["before_start_date"] = int(mask.sum())
-        df = df.loc[~mask]
-    if end_date:
-        mask = df["arrival_date"] > pd.Timestamp(end_date)
-        report.filtered["after_end_date"] = int(mask.sum())
-        df = df.loc[~mask]
-    if commodities:
-        wanted = {c.casefold() for c in commodities}
-        mask = ~df["commodity"].str.casefold().isin(wanted)
-        report.filtered["other_commodities"] = int(mask.sum())
-        df = df.loc[~mask]
-
-    df = _drop(df, df.duplicated(keep="first"), "exact_duplicate", report)
-    df = _drop(df, df.duplicated(subset=KEY_COLUMNS, keep=False), "conflicting_duplicate", report)
-
-    df = df.sort_values(KEY_COLUMNS).reset_index(drop=True)
-    df["arrival_date"] = df["arrival_date"].dt.strftime("%Y-%m-%d")
-    return df
-
-
-def summarize(df: pd.DataFrame) -> dict[str, Any]:
-    if df.empty:
-        return {}
-    return {
-        "date_min": df["arrival_date"].min(),
-        "date_max": df["arrival_date"].max(),
-        "states": int(df["state"].nunique()),
-        "districts": int(df[["state", "district"]].drop_duplicates().shape[0]),
-        "markets": int(df[["state", "district", "market"]].drop_duplicates().shape[0]),
-        "commodities": int(df["commodity"].nunique()),
-        "top_commodities_by_rows": df["commodity"].value_counts().head(10).to_dict(),
+    report.summary = {
+        "year_min": int(df["year"].min()),
+        "year_max": int(df["year"].max()),
+        "entities": len(countries),
+        "latest_year_with_data": {
+            column: int(df.loc[df[column].notna(), "year"].max())
+            for column in ("population", "gdp", "primary_energy_consumption", "co2", "total_ghg")
+        },
     }
+    return countries, tables
 
 
-def describe_input(path: Path) -> dict[str, Any]:
-    info: dict[str, Any] = {"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-    manifest = path.with_suffix(".manifest.json")
+def run(input_path: Path = RAW_FILE, output_dir: Path = PROCESSED_DIR) -> CleaningReport:
+    if not input_path.exists():
+        raise CleaningError(f"{input_path} not found. Run `python -m scripts.ingest_data` first.")
+    report = CleaningReport(
+        input_file={"file": input_path.name, "sha256": hashlib.sha256(input_path.read_bytes()).hexdigest()}
+    )
+    manifest = input_path.parent / "owid-co2.manifest.json"
     if manifest.exists():
-        info["manifest"] = json.loads(manifest.read_text())
-    return info
+        report.input_file["manifest"] = json.loads(manifest.read_text())
 
-
-def run(
-    inputs: list[Path],
-    output_dir: Path = PROCESSED_DIR,
-    start_date: date | None = None,
-    end_date: date | None = None,
-    commodities: list[str] | None = None,
-) -> CleaningReport:
-    report = CleaningReport()
-    frames = []
-    for path in inputs:
-        raw = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
-        report.input_files.append({**describe_input(path), "rows": len(raw)})
-        report.rows_read += len(raw)
-        frames.append(canonicalize_columns(raw, path.name))
-
-    combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=OUTPUT_COLUMNS)
-    cleaned = clean_frame(combined, report, start_date, end_date, commodities)
-    report.rows_written = len(cleaned)
-    report.summary = summarize(cleaned)
+    df = pd.read_csv(input_path, keep_default_na=True, na_values=[""], dtype={"iso_code": "string"})
+    countries, tables = clean(df, report)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    cleaned.to_csv(output_dir / OUTPUT_NAME, index=False, float_format="%.2f")
+    countries.to_csv(output_dir / COUNTRIES_FILE, index=False)
+    for table, frame in tables.items():
+        frame.to_csv(output_dir / f"{table}.csv", index=False)
     (output_dir / REPORT_NAME).write_text(json.dumps(report.to_dict(), indent=2, default=str) + "\n")
     return report
 
@@ -258,24 +273,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("inputs", nargs="+", type=Path, help="Raw CSV files")
+    parser.add_argument("input", nargs="?", type=Path, default=RAW_FILE)
     parser.add_argument("--output-dir", type=Path, default=PROCESSED_DIR)
-    parser.add_argument("--start-date", type=date.fromisoformat)
-    parser.add_argument("--end-date", type=date.fromisoformat)
-    parser.add_argument(
-        "--commodity", action="append", dest="commodities", help="Keep only these (repeatable)"
-    )
     args = parser.parse_args(argv)
 
     try:
-        report = run(args.inputs, args.output_dir, args.start_date, args.end_date, args.commodities)
+        report = run(args.input, args.output_dir)
     except CleaningError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    print(f"Read {report.rows_read:,} rows, wrote {report.rows_written:,} to {args.output_dir / OUTPUT_NAME}")
-    for reason, count in report.dropped.items():
-        if count:
-            print(f"  dropped {count:,} ({reason})")
+    print(f"Read {report.rows_read:,} rows; excluded {report.rows_excluded:,} rows of (GCP) entities.")
+    print(f"Entities: {report.entities_by_type}")
+    for table, count in report.rows_written.items():
+        print(f"  {table}: {count:,} rows")
     return 0
 
 

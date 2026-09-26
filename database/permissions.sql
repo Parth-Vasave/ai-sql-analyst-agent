@@ -39,4 +39,4 @@ GRANT USAGE ON SCHEMA public TO sql_agent;
 -- Table level: explicit allow-list, SELECT only. New tables are NOT granted automatically.
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM sql_agent;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM sql_agent;
-GRANT SELECT ON commodities, markets, daily_prices TO sql_agent;
+GRANT SELECT ON countries, country_indicators, co2_emissions, ghg_emissions TO sql_agent;

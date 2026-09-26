@@ -1,13 +1,13 @@
 # Local stack. Copy .env.example to .env and fill in the passwords first.
 #   docker compose up -d                      # postgres (schema + sql_agent role) and backend
-#   docker compose run --rm seed              # load data/processed/daily_prices_clean.csv
+#   docker compose run --rm seed              # download OWID data (pinned), clean and load it
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mandi_owner}
+      POSTGRES_USER: ${POSTGRES_USER:-emissions_owner}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-mandi}
+      POSTGRES_DB: ${POSTGRES_DB:-emissions}
       SQL_AGENT_PASSWORD: ${SQL_AGENT_PASSWORD:?Set SQL_AGENT_PASSWORD in .env}
       QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-5}
       SQL_DIR: /db
@@ -27,7 +27,7 @@ services:
     build: ./backend
     environment:
       # The API only ever connects as the read-only sql_agent role.
-      DATABASE_URL: postgresql://sql_agent:${SQL_AGENT_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandi}
+      DATABASE_URL: postgresql://sql_agent:${SQL_AGENT_PASSWORD}@postgres:5432/${POSTGRES_DB:-emissions}
       QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-5}
       MAX_RETRIES: ${MAX_RETRIES:-2}
       MAX_ROWS: ${MAX_ROWS:-1000}
@@ -46,7 +46,7 @@ services:
       context: .
       dockerfile: scripts/Dockerfile
     environment:
-      ADMIN_DATABASE_URL: postgresql://${POSTGRES_USER:-mandi_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandi}
+      ADMIN_DATABASE_URL: postgresql://${POSTGRES_USER:-emissions_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-emissions}
     volumes:
       - ./data:/work/data
     depends_on:

@@ -1,100 +1,134 @@
-"""Tests for scripts/clean_data.py using the synthetic fixture (see fixtures/README.md)."""
+"""Tests for scripts/clean_data.py using a real OWID extract (see fixtures/README.md)."""
 
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from scripts import clean_data
-from scripts.clean_data import CleaningError, normalize_header
+from scripts.clean_data import CleaningError, CleaningReport, classify_entity
 
-FIXTURE = Path(__file__).parent / "fixtures" / "synthetic_raw_datagovin.csv"
+FIXTURE = Path(__file__).parent / "fixtures" / "owid_co2_subset.csv"
 
 
 @pytest.fixture
-def cleaned(tmp_path: Path) -> tuple[pd.DataFrame, dict]:
-    clean_data.run([FIXTURE], output_dir=tmp_path)
-    df = pd.read_csv(tmp_path / clean_data.OUTPUT_NAME, dtype=str)
-    report = json.loads((tmp_path / clean_data.REPORT_NAME).read_text())
-    return df, report
+def output(tmp_path: Path) -> Path:
+    clean_data.run(FIXTURE, output_dir=tmp_path)
+    return tmp_path
+
+
+def read(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path, dtype={"iso_code": "string"})
+
+
+def load_fixture() -> pd.DataFrame:
+    return pd.read_csv(FIXTURE, dtype={"iso_code": "string"})
 
 
 @pytest.mark.parametrize(
-    ("raw", "expected"),
+    ("name", "iso", "expected"),
     [
-        ("Min_x0020_Price", "min_price"),
-        ("Min Price (Rs./Quintal)", "min_price_rs_quintal"),
-        (" Arrival_Date ", "arrival_date"),
-        ("STATE", "state"),
+        ("India", "IND", "country"),
+        ("Kosovo", pd.NA, "country"),
+        ("World", pd.NA, "region"),
+        ("European Union (27)", pd.NA, "region"),
+        ("Low-income countries", pd.NA, "income_group"),
+        ("International aviation", pd.NA, "other"),
     ],
 )
-def test_normalize_header(raw: str, expected: str) -> None:
-    assert normalize_header(raw) == expected
+def test_classify_entity(name: str, iso: object, expected: str) -> None:
+    assert classify_entity(name, iso) == expected
 
 
-def test_output_has_canonical_columns(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, _ = cleaned
-    assert list(df.columns) == clean_data.OUTPUT_COLUMNS
+def test_unknown_aggregate_is_rejected() -> None:
+    with pytest.raises(CleaningError, match="Atlantis"):
+        classify_entity("Atlantis", pd.NA)
 
 
-def test_every_drop_rule_is_counted(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, report = cleaned
-    assert report["rows_read"] == 17
-    assert report["rows_dropped"] == {
-        "missing_location_or_commodity": 1,
-        "invalid_date": 1,
-        "non_numeric_price": 1,
-        "non_positive_price": 1,
-        "min_price_above_max_price": 1,
-        "modal_price_outside_min_max": 1,
-        "exact_duplicate": 1,
-        "conflicting_duplicate": 2,
+def test_entities_are_classified_and_gcp_duplicates_excluded(output: Path) -> None:
+    countries = read(output / clean_data.COUNTRIES_FILE).set_index("name")
+    assert countries["entity_type"].to_dict() == {
+        "China": "country",
+        "Germany": "country",
+        "High-income countries": "income_group",
+        "India": "country",
+        "International shipping": "other",
+        "Kosovo": "country",
+        "United States": "country",
+        "Asia": "region",
+        "World": "region",
     }
-    assert report["rows_written"] == len(df) == 8
-    assert report["rows_read"] - sum(report["rows_dropped"].values()) == report["rows_written"]
+    assert pd.isna(countries.loc["Kosovo", "iso_code"])
+    assert countries.loc["India", "iso_code"] == "IND"
+
+    report = json.loads((output / clean_data.REPORT_NAME).read_text())
+    assert report["rows_read"] == 60
+    assert report["excluded_entities"] == ["Asia (GCP)"]
+    assert report["rows_excluded"] == 6
 
 
-def test_text_is_trimmed_and_numbers_parsed(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, _ = cleaned
-    row = df[(df["commodity"] == "Onion") & (df["arrival_date"] == "2024-01-16")].iloc[0]
-    assert (row["state"], row["district"], row["market"]) == ("Test State B", "District B1", "Market B1")
-    assert [float(row[c]) for c in clean_data.PRICE_COLUMNS] == [1100.0, 1700.0, 1400.0]
+def test_tables_have_expected_columns_and_no_empty_rows(output: Path) -> None:
+    for table, metrics in clean_data.TABLE_COLUMNS.items():
+        frame = read(output / f"{table}.csv")
+        assert list(frame.columns) == ["country", "year", *metrics]
+        assert frame[metrics].notna().any(axis=1).all()
+        assert not frame.duplicated(["country", "year"]).any()
 
 
-def test_dates_are_iso_and_day_first(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, report = cleaned
-    assert "2023-01-15" in set(df["arrival_date"])
-    assert report["summary"]["date_min"] == "2023-01-15"
-    assert report["summary"]["date_max"] == "2024-01-17"
+def test_values_are_preserved(output: Path) -> None:
+    co2 = read(output / "co2_emissions.csv").set_index(["country", "year"])
+    source = load_fixture().set_index(["country", "year"])
+    assert co2.loc[("India", 2024), "co2"] == source.loc[("India", 2024), "co2"]
+    assert co2.loc[("World", 2023), "share_global_co2"] == pytest.approx(100.0)
 
 
-def test_missing_variety_and_grade_become_unknown(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, report = cleaned
-    row = df[(df["commodity"] == "Onion") & (df["arrival_date"] == "2024-01-17")].iloc[0]
-    assert (row["variety"], row["grade"]) == ("Unknown", "Unknown")
-    assert report["values_filled_with_unknown"] == {"variety": 1, "grade": 1}
+def test_population_is_integer(output: Path) -> None:
+    indicators = read(output / "country_indicators.csv")
+    population = indicators["population"].dropna()
+    assert (population == population.round()).all()
 
 
-def test_conflicting_duplicates_are_all_removed(cleaned: tuple[pd.DataFrame, dict]) -> None:
-    df, _ = cleaned
-    assert df[(df["market"] == "Market A2") & (df["arrival_date"] == "2024-01-17")].empty
+def test_negative_values_are_nulled_and_counted() -> None:
+    df = load_fixture()
+    df.loc[df["country"] == "India", "coal_co2"] = -1.0
+    report = CleaningReport()
+    _, tables = clean_data.clean(df, report)
+    assert report.negative_values_nulled == {"coal_co2": 6}
+    india = tables["co2_emissions"].query("country == 'India'")
+    assert india["coal_co2"].isna().all()
 
 
-def test_filters_are_reported_separately(tmp_path: Path) -> None:
-    report = clean_data.run(
-        [FIXTURE], output_dir=tmp_path, start_date=date(2024, 1, 1), commodities=["wheat"]
-    )
-    # Filters run before de-duplication, so the 2023 exact duplicate counts as filtered too.
-    assert report.filtered == {"before_start_date": 3, "other_commodities": 3}
-    assert report.rows_written == 3
+def test_signed_columns_keep_negative_values() -> None:
+    df = load_fixture()
+    df.loc[df["country"] == "India", "land_use_change_co2"] = -5.0
+    report = CleaningReport()
+    _, tables = clean_data.clean(df, report)
+    assert report.negative_values_nulled == {}
+    assert (tables["co2_emissions"].query("country == 'India'")["land_use_change_co2"] == -5.0).all()
 
 
-def test_missing_required_column_is_an_error(tmp_path: Path) -> None:
-    bad = tmp_path / "bad.csv"
-    bad.write_text("State,District,Market,Commodity,Arrival_Date\nA,B,C,D,01/01/2024\n")
-    with pytest.raises(CleaningError, match="min_price"):
-        clean_data.run([bad], output_dir=tmp_path)
+def test_duplicate_entity_year_is_an_error() -> None:
+    df = load_fixture()
+    df = pd.concat([df, df.head(1)], ignore_index=True)
+    with pytest.raises(CleaningError, match="Duplicate"):
+        clean_data.clean(df, CleaningReport())
+
+
+def test_invalid_iso_code_is_an_error() -> None:
+    df = load_fixture()
+    df.loc[df["country"] == "India", "iso_code"] = "IN"
+    with pytest.raises(CleaningError, match="ISO"):
+        clean_data.clean(df, CleaningReport())
+
+
+def test_missing_column_is_an_error() -> None:
+    with pytest.raises(CleaningError, match="co2_per_capita"):
+        clean_data.clean(load_fixture().drop(columns=["co2_per_capita"]), CleaningReport())
+
+
+def test_missing_input_file_has_helpful_message(tmp_path: Path) -> None:
+    with pytest.raises(CleaningError, match="ingest_data"):
+        clean_data.run(tmp_path / "missing.csv", output_dir=tmp_path)

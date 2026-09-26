@@ -16,11 +16,10 @@ Evaluation Categories
 
 Questions involving:
 
-* commodity
-* state
-* district
-* market
-* date
+* country / region / income group
+* year or year range
+* emission metric (total, per capita, by fuel, greenhouse gas)
+* entity type (countries vs aggregates such as World or continents)
 
 Target: 10 questions.
 
@@ -169,7 +168,7 @@ Example:
 {
   "id": "Q001",
   "category": "ranking",
-  "question": "Which state had the highest average wheat price in 2024?",
+  "question": "Which country had the highest CO2 emissions per capita in 2024?",
   "expected_behavior": "query",
   "ground_truth": {
     "description": "Verified result for the question"

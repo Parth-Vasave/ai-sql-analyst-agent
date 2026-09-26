@@ -5,7 +5,7 @@
 # (docker-entrypoint-initdb.d), connecting over the local socket as POSTGRES_USER.
 # Outside Docker, point it at any database with ADMIN_DATABASE_URL:
 #
-#   ADMIN_DATABASE_URL=postgresql://owner:pw@localhost:5432/mandi \
+#   ADMIN_DATABASE_URL=postgresql://owner:pw@localhost:5432/emissions \
 #   SQL_AGENT_PASSWORD=... ./database/init/00_init.sh
 set -euo pipefail
 

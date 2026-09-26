@@ -2,80 +2,83 @@
 
 ## Source
 
-Indian agricultural mandi (wholesale market) prices published by **AGMARKNET**
-(Directorate of Marketing & Inspection, Ministry of Agriculture & Farmers Welfare) on the
-**Open Government Data Platform India — [data.gov.in](https://data.gov.in)**.
+**Our World in Data — CO₂ and Greenhouse Gas Emissions**
+Repository: <https://github.com/owid/co2-data> · Licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-| Resource | data.gov.in resource ID | Coverage |
-|---|---|---|
-| Variety-wise Daily Market Prices Data of Commodity | `35985678-0d79-46b4-9ed6-6f13308a1d24` | Historical daily prices (used for multi-year analysis) |
-| Current Daily Price of Various Commodities from Various Markets (Mandi) | `9ef84268-d588-465a-a308-a864a43d0070` | Latest day only |
+OWID compiles this dataset from primary sources, listed per column in `owid-co2-codebook.csv`:
 
-Resource IDs should be confirmed on the portal before a large download.
-Licence: [Government Open Data License – India](https://data.gov.in/government-open-data-license-india).
+- Global Carbon Budget (2025): CO₂ emissions, by fuel, land-use change, consumption-based
+- Jones et al. (2024): methane, nitrous oxide, total greenhouse gases, temperature change
+- Energy Institute *Statistical Review of World Energy* and U.S. EIA: primary energy
+- Maddison Project Database: GDP
+- OWID population series (UN WPP, HYDE, Gapminder)
 
-**Download date:** _not yet downloaded_. Every download writes a `*.manifest.json` next to
-the raw CSV with the resource ID, filters, UTC timestamp, row count and SHA-256, and
-`data/processed/cleaning_report.json` copies those manifests. This table will be
-filled in from the manifest of the dataset actually used.
+| | |
+|---|---|
+| Pinned commit | `382ee6c662b0ece26e111f263b44c029afad7787` |
+| `owid-co2-data.csv` SHA-256 | `7f78e2b218ce4bb8c538bbec04fdc9a7982e8d40bff972e650df603899edd5f6` |
+| `owid-co2-codebook.csv` SHA-256 | `33b4f5e00efd58c7b83863f736beba1af4df946b43642b0400c3ec38648e0e8e` |
+| Retrieved | 2026-09-26 |
+| Coverage | 1750–2024, 254 entities (242 after cleaning), 50,411 rows × 79 columns |
 
-## Getting the raw data
+Attribution: *Our World in Data, "CO₂ and Greenhouse Gas Emissions", https://github.com/owid/co2-data.*
 
-Either:
+## Getting the data
 
 ```bash
-# A. API (free key from https://data.gov.in → My Account → API key)
-DATA_GOV_IN_API_KEY=... python -m scripts.ingest_data --dataset historical \
-    --filter Commodity=Wheat --max-records 100000
+python -m scripts.ingest_data     # downloads the pinned commit into data/raw/ and checks both SHA-256 hashes
+python -m scripts.clean_data      # writes data/processed/*.csv and cleaning_report.json
+ADMIN_DATABASE_URL=postgresql://... python -m scripts.seed_database
 ```
 
-or **B.** download a CSV from the data.gov.in resource page (or AGMARKNET) and put it in
-`data/raw/`. Add a small `<file>.manifest.json` by hand recording the source URL and the
-download date so provenance is not lost.
-
-`data/raw/` and `data/processed/` are git-ignored; raw government data is not committed.
-
-## Columns used
-
-| Source column (data.gov.in) | Canonical | Notes |
-|---|---|---|
-| `State` | `state` | |
-| `District` | `district` | |
-| `Market` | `market` | Mandi / APMC name |
-| `Commodity` | `commodity` | |
-| `Variety` | `variety` | `Unknown` if blank |
-| `Grade` | `grade` | e.g. FAQ; `Unknown` if blank |
-| `Arrival_Date` | `arrival_date` | `dd/mm/yyyy` in source → ISO date |
-| `Min_x0020_Price` / `Min Price (Rs./Quintal)` | `min_price` | INR per quintal |
-| `Max_x0020_Price` / `Max Price (Rs./Quintal)` | `max_price` | INR per quintal |
-| `Modal_x0020_Price` / `Modal Price (Rs./Quintal)` | `modal_price` | INR per quintal; most common price that day |
-
-Other columns (e.g. `Commodity_Code`) are ignored.
+With Docker, `docker compose run --rm seed` runs all three steps. `data/raw/` and
+`data/processed/` are git-ignored; the data is always rebuilt from the pinned source.
+`data/raw/owid-co2.manifest.json` records the commit, download time and hashes of each run.
 
 ## Cleaning
 
-`python -m scripts.clean_data data/raw/*.csv` applies these rules and counts every dropped
-row in `data/processed/cleaning_report.json`:
+1. All 46 source columns used by the schema must be present, or the run stops.
+2. Entity names are trimmed; ISO codes must be three letters.
+3. The 12 entities suffixed **"(GCP)"** (1,834 rows) are excluded. They are the Global
+   Carbon Project's alternative region definitions, duplicating OWID's own regions
+   ("Asia" vs "Asia (GCP)"), and would make region questions ambiguous.
+4. Each entity is classified (`countries.entity_type`):
+   - **country** (219): has an ISO code, plus Kosovo (no ISO code in OWID)
+   - **region** (15): World, continents, EU-27/28, "Europe (excl. EU-27)", OECD, least developed countries
+   - **income_group** (4): World Bank high / upper-middle / lower-middle / low income
+   - **other** (4): International aviation, International shipping, Kuwaiti Oil Fires, Ryukyu Islands
 
-1. Column names are normalized and mapped to the canonical names above; a file missing a required column is rejected.
-2. Text is trimmed and repeated whitespace collapsed. Casing is kept as published.
-3. Blank `variety` / `grade` → `Unknown`.
-4. Rows without state, district, market or commodity are dropped.
-5. Dates are parsed day-first (`dd/mm/yyyy`) or ISO; anything else (including impossible dates such as 31/02) is dropped. Month-first is never guessed.
-6. Prices must be numeric and > 0, with `min_price <= modal_price <= max_price`; otherwise the row is dropped.
-7. Optional `--start-date`, `--end-date`, `--commodity` filters (reported separately from errors).
-8. Exact duplicate rows are collapsed.
-9. Rows that share the natural key (state, district, market, commodity, variety, grade, date) but disagree on prices are **all** dropped, since the correct one cannot be determined.
+   An entity with no ISO code that is not on these lists stops the run, so new OWID
+   aggregates are never mislabeled as countries.
+5. A duplicate (entity, year) stops the run (none exist).
+6. Negative values in columns that cannot be negative are set to NULL and counted (none in
+   the pinned version). Land-use change, trade, growth and total GHG can legitimately be negative and are kept.
+7. Each table stores only the (entity, year) rows where at least one of its metrics is present.
 
-## Assumptions
+Result (pinned version): `country_indicators` 41,243 rows, `co2_emissions` 45,950,
+`ghg_emissions` 41,458.
 
-- Prices are INR per quintal (100 kg), as AGMARKNET publishes them.
-- "Price" in a question means the **modal price** unless the user names min/max.
-- Market identity is (state, district, market name). Spelling variants of the same place across source files are not merged.
-- `commodities.category` is left empty; the source does not provide a commodity group.
+**Not loaded:** 33 of the 79 source columns, all derivable from or variants of the ones kept:
+per-fuel cumulative totals (6), per-fuel / land-use / cumulative global shares (16),
+cement, flaring, land-use and other per-capita values (4), land-use-inclusive growth,
+intensity and cumulative variants (6), and consumption CO₂ per GDP (1).
+`cleaning_report.json` lists them exactly.
+
+## Assumptions and caveats
+
+- "Emissions" means annual CO₂ from fossil fuels and industry (`co2`, million tonnes) unless the question says per capita, land use, or greenhouse gases.
+- Rankings of "countries" exclude aggregates (`entity_type = 'country'`); World and regions are not countries.
+- **GDP ends in 2022**; all other series run to 2024. Early years (before about 1950) are sparse, and missing values are NULL, never zero.
+- Methane, nitrous oxide and total GHG are in CO₂-equivalents over a 100-year timescale.
+- Values are stored exactly as published; nothing is imputed or recalculated.
 
 ## Database schema
 
-See [`database/schema.sql`](../database/schema.sql). Normalized into `commodities`,
-`markets` and `daily_prices`, with CHECK constraints mirroring the cleaning rules and indexes on
-`(commodity_id, arrival_date)`, `arrival_date`, `markets.state` and `markets.district`.
+See [`database/schema.sql`](../database/schema.sql); every column has a comment with its unit.
+
+| Table | Key | Contents |
+|---|---|---|
+| `countries` | `id` | name, ISO code, entity_type |
+| `country_indicators` | `(country_id, year)` | population, GDP, primary energy, energy per capita and per GDP |
+| `co2_emissions` | `(country_id, year)` | total and per-capita CO₂, by fuel, land use, consumption-based, trade, cumulative, global shares |
+| `ghg_emissions` | `(country_id, year)` | methane, nitrous oxide, total GHG, per capita, temperature-change contribution |
