@@ -2,12 +2,14 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 3 — SQL safety validation (Milestone 2 done, verified with the real LLM)
+Milestone 5 — Query planner (Milestone 3 and the LIMIT rewrite of Milestone 4 done)
 
 Current Objective
 
-Milestone 3 (AST SQL validator), with Milestone 4's LIMIT rewrite in the same change. Until Milestone 3
-the read-only database account is the only guard against unsafe SQL: do not expose the API publicly yet.
+Milestone 5 (query planner), then Milestone 6 (repair/retry). The validator's rejection codes and the
+executor's error categories are the inputs for repair; Milestone 4's "retry a timed-out query with a
+cheaper one" belongs to that same loop. Both safety layers (read-only account + SQL validator) are now
+in place; before a public deployment still add request rate limiting (Milestone 13).
 
 ⸻
 
@@ -61,15 +63,26 @@ Later in this track
 
 Milestone 3 — SQL safety validation
 
-* [ ] AST validation with sqlglot: single SELECT only, allow-listed tables/columns, no system catalogs
-* [ ] Reject INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/GRANT/REVOKE, multiple statements
-* [ ] Block dangerous functions (pg_sleep, pg_read_file, dblink, ...)
-* [ ] Security tests
+* [x] AST validation with sqlglot (backend/app/agent/sql_validator.py): single SELECT / set operation
+      only, tables must be in the profile (scope-aware, so CTEs cannot shadow real tables), columns
+      resolved against the profile, no system catalogs, no cross-database references
+* [x] Reject INSERT/UPDATE/DELETE/MERGE/DROP/ALTER/CREATE/TRUNCATE/GRANT/COPY/SET, SELECT INTO,
+      FOR UPDATE, data-modifying CTEs, multiple statements
+* [x] Functions: sqlglot-modelled functions allowed; unmodelled ones only from a small allow-list;
+      pg_*, lo_*, dblink, set_config, current_setting, ... always denied
+* [x] Sensitive columns are unknown to the validator; SELECT * and whole-row references (`SELECT c`,
+      `c::text`, `json_build_object('r', c)`) rejected, since they would read sensitive columns
+* [x] Validation is a trace step; rejections return category "validation" + a machine-readable code
+      and never reach the database. The SQL that runs is regenerated from the validated tree.
+* [x] Executor sends SQL through a plain DB-API cursor (text() broke on ':name' inside literals)
+* [x] Security tests: 47 rejection cases, 19 accepted queries incl. the 10 real LLM queries, whose
+      regenerated SQL returns the same rows as the original on PostgreSQL
 
 Milestone 4 — Read-only user + timeout + LIMIT enforcement
 
 * [x] Read-only role and database-level timeout (done early in Milestone 1)
-* [ ] LIMIT enforcement by AST rewrite (add or clamp to MAX_ROWS)
+* [x] LIMIT enforcement by AST rewrite: added when missing, clamped to MAX_ROWS (also FETCH FIRST);
+      non-literal LIMIT rejected. The executor's client-side row cap stays as a second guard.
 * [ ] Timeout surfaced as a trace event with retry for a cheaper query
 
 Milestone 5 — Query planner
@@ -99,6 +112,9 @@ Completed Work
   answered from OWID's own aggregate rows, which is a reasonable reading but should become an eval
   case with explicit ground truth. SQL generation takes 3–16 s on the free tier; schema retrieval
   ~120 ms, mostly re-reflecting for the fingerprint check (could be cached for a short TTL).
+* Milestone 3 (2026-09-26): 160 backend + 35 pipeline tests pass against PostgreSQL 16. Live check
+  on gemini-3.5-flash: validated queries ran with the validation step taking 4–10 ms; a prompt
+  injection asking to delete data was declined by the model (the validator is the backstop).
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 
@@ -121,6 +137,10 @@ Important Decisions
   "countries" questions can exclude them; "(GCP)" duplicate regions are excluded.
 * Security boundary is the database: sql_agent has SELECT on four tables only; read-only default and
   statement_timeout are set on the role and again per session. The SQL validator is a second layer.
+* SQL validator design: allow-list, not deny-list, wherever possible (statement type, tables from the
+  profile, unmodelled functions). The executed SQL is regenerated from the checked syntax tree, so a
+  parser difference between sqlglot and the database cannot smuggle in unchecked text. Rejection
+  messages name the problem (for the upcoming repair loop) without listing hidden tables or columns.
 * Seeding/ingestion use a separate owner account (ADMIN_DATABASE_URL); the API never gets it.
 * psycopg 3 with plain SQL, no ORM: the schema is small and read-only for the app.
 * Schema via idempotent SQL scripts instead of a migration tool (Alembic not needed yet).

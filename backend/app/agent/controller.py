@@ -1,4 +1,4 @@
-"""Orchestrates one question: schema retrieval -> SQL generation -> execution.
+"""Orchestrates one question: schema retrieval -> SQL generation -> validation -> execution.
 
 Each step appends a structured TraceEvent (what happened, how long it took, key outputs),
 never the model's reasoning. Later milestones add validation, repair, answer and chart steps.
@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.agent.executor import QueryExecutionError, QueryResult, execute
 from app.agent.schema_retriever import build_context
 from app.agent.sql_generator import PROMPT_VERSION, generate_sql
+from app.agent.sql_validator import SQLRejectedError, validate_sql
 from app.database.connections import DatabaseConnection
 from app.llm.client import LLMClient, LLMError
 
@@ -30,6 +31,7 @@ class TraceEvent(BaseModel):
 class QueryError(BaseModel):
     category: str
     message: str
+    code: str | None = None  # finer reason, e.g. the validator's rejection code
 
 
 class QueryMetadata(BaseModel):
@@ -122,14 +124,32 @@ class AgentController:
                 metadata=meta,
             )
 
+        # Never trust generated SQL: only a validated, rewritten query reaches the database.
         try:
-            result: QueryResult = execute(connection, generated.sql, self.max_rows)
+            with trace.timed() as ms:
+                validated = validate_sql(generated.sql, profile, meta.dialect, self.max_rows)
+        except SQLRejectedError as exc:
+            trace.record("sql_validation", "failed", ms[0], code=exc.code, error=exc.message)
+            failed = self._error(question, trace, meta, "validation", exc.message, code=exc.code)
+            failed.sql, failed.explanation = generated.sql, generated.explanation
+            return failed
+        meta.tables_used = validated.tables
+        trace.record(
+            "sql_validation",
+            duration_ms=ms[0],
+            tables=validated.tables,
+            limit=validated.limit,
+            limit_action=validated.limit_action,
+        )
+
+        try:
+            result: QueryResult = execute(connection, validated.sql, self.max_rows)
         except QueryExecutionError as exc:
             trace.record(
                 "query_execution", "failed", exc.duration_ms, category=exc.category, error=exc.message
             )
             failed = self._error(question, trace, meta, exc.category, exc.message)
-            failed.sql, failed.explanation = generated.sql, generated.explanation
+            failed.sql, failed.explanation = validated.sql, generated.explanation
             return failed
 
         meta.execution_time_ms, meta.row_count, meta.truncated = (
@@ -148,7 +168,7 @@ class AgentController:
             status="success",
             question=question,
             explanation=generated.explanation,
-            sql=generated.sql,
+            sql=validated.sql,
             columns=result.columns,
             rows=result.rows,
             chart_suggestion=generated.chart_suggestion,
@@ -157,12 +177,19 @@ class AgentController:
         )
 
     @staticmethod
-    def _error(question: str, trace: _Trace, meta: QueryMetadata, category: str, message: str) -> AgentResult:
+    def _error(
+        question: str,
+        trace: _Trace,
+        meta: QueryMetadata,
+        category: str,
+        message: str,
+        code: str | None = None,
+    ) -> AgentResult:
         trace.record("completed", "failed")
         return AgentResult(
             status="error",
             question=question,
-            error=QueryError(category=str(category), message=message),
+            error=QueryError(category=str(category), message=message, code=code),
             trace=trace.events,
             metadata=meta,
         )

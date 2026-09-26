@@ -1,5 +1,7 @@
 """Execute validated SQL on a read-only connection and collect the result.
 
+Only SQL accepted by sql_validator reaches this module.
+
 The row cap is enforced here, on the client side, regardless of the SQL's own LIMIT:
 at most max_rows rows are ever fetched, and `truncated` says whether more existed.
 """
@@ -13,7 +15,6 @@ from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.database.adapters import ErrorCategory
@@ -48,7 +49,7 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-def _error_message(error: DBAPIError) -> str:
+def _error_message(error: Exception) -> str:
     """The database's own first message line, e.g. 'column "states" does not exist'."""
     original = getattr(error, "orig", None) or error
     return str(original).strip().splitlines()[0][:500] if str(original).strip() else error.__class__.__name__
@@ -59,11 +60,18 @@ def execute(connection: DatabaseConnection, sql: str, max_rows: int) -> QueryRes
     try:
         with connection.connect() as conn:
             connection.adapter.begin_read_only(conn)
-            cursor = conn.execute(text(sql))
-            columns = list(cursor.keys())
-            fetched = cursor.fetchmany(max_rows + 1)
+            # A plain DB-API cursor, called without parameters, sends the validated SQL exactly
+            # as it is: SQLAlchemy's text() would treat ':name' in string literals as bind
+            # parameters, and a parameter list would make the driver parse '%' as placeholders.
+            cursor = conn.connection.cursor()
+            try:
+                cursor.execute(sql)
+                columns = [d[0] for d in cursor.description or []]
+                fetched = cursor.fetchmany(max_rows + 1)
+            finally:
+                cursor.close()
             conn.rollback()
-    except DBAPIError as exc:
+    except (DBAPIError, connection.engine.dialect.loaded_dbapi.Error) as exc:
         duration_ms = int((time.perf_counter() - started) * 1000)
         raise QueryExecutionError(
             connection.adapter.classify_error(exc), _error_message(exc), duration_ms

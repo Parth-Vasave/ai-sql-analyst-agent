@@ -1,0 +1,557 @@
+{
+ "database_id": "owid",
+ "dialect": "postgresql",
+ "sampling": "off",
+ "fingerprint": "8879aaa99085b8776461f9ffe8912fa63d8e738535ab98da31e23c5841b6aeba",
+ "tables": [
+  {
+   "schema_name": "public",
+   "name": "co2_emissions",
+   "kind": "table",
+   "comment": "Yearly carbon dioxide (CO2) emissions per entity, total and by source. Units: million tonnes (Mt) unless stated.",
+   "estimated_rows": null,
+   "columns": [
+    {
+     "name": "country_id",
+     "type": "INTEGER",
+     "nullable": false,
+     "comment": null,
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "year",
+     "type": "SMALLINT",
+     "nullable": false,
+     "comment": "Calendar year.",
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual fossil and industry CO2 emissions, excluding land-use change, million tonnes (Mt). Default metric for \"CO2 emissions\".",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_per_gdp",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions per unit of GDP, kilograms per international-$ (kg/$).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_per_unit_energy",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions per unit of primary energy, grams per kilowatt-hour (g/kWh).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_growth_abs",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Absolute change in annual CO2 emissions from the previous year, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_growth_prct",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Percentage change in annual CO2 emissions from the previous year, percent (%).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "coal_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from coal, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "oil_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from oil, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "gas_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from natural gas, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "cement_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from cement production, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "flaring_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from gas flaring, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "other_industry_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from other industry sources, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "coal_co2_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from coal per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "oil_co2_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from oil per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "gas_co2_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from gas per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "land_use_change_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions from land-use change (e.g. deforestation), million tonnes (Mt). Can be negative (net removal).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_including_luc",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions including land-use change, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "co2_including_luc_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual CO2 emissions including land-use change per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "consumption_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual consumption-based (trade-adjusted) CO2 emissions, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "consumption_co2_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual consumption-based CO2 emissions per person, tonnes per person (t/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "trade_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "CO2 emissions embedded in trade (consumption minus production), million tonnes (Mt). Positive = net importer of CO2.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "trade_co2_share",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "CO2 embedded in trade as a percentage of production-based emissions, percent (%).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "cumulative_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Cumulative CO2 emissions since the first recorded year, million tonnes (Mt).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "share_global_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Share of global annual CO2 emissions, percent (%).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "share_global_cumulative_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Share of global cumulative CO2 emissions, percent (%).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    }
+   ]
+  },
+  {
+   "schema_name": "public",
+   "name": "countries",
+   "kind": "table",
+   "comment": "Countries and aggregate entities (World, continents, EU, income groups). Filter entity_type = 'country' when ranking or comparing countries.",
+   "estimated_rows": null,
+   "columns": [
+    {
+     "name": "id",
+     "type": "INTEGER",
+     "nullable": false,
+     "comment": null,
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "name",
+     "type": "TEXT",
+     "nullable": false,
+     "comment": "Entity name as published by Our World in Data, e.g. India, United States, World, Europe.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "iso_code",
+     "type": "CHAR(3)",
+     "nullable": true,
+     "comment": "ISO 3166-1 alpha-3 code, e.g. IND, USA. NULL for aggregates and Kosovo.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "entity_type",
+     "type": "TEXT",
+     "nullable": false,
+     "comment": "country | region (World, continents, EU, OECD) | income_group (World Bank income groups) | other (international aviation/shipping, Kuwaiti oil fires, Ryukyu Islands).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    }
+   ]
+  },
+  {
+   "schema_name": "public",
+   "name": "country_indicators",
+   "kind": "table",
+   "comment": "Yearly population, GDP and primary energy use per entity.",
+   "estimated_rows": null,
+   "columns": [
+    {
+     "name": "country_id",
+     "type": "INTEGER",
+     "nullable": false,
+     "comment": null,
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "year",
+     "type": "SMALLINT",
+     "nullable": false,
+     "comment": "Calendar year.",
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "population",
+     "type": "BIGINT",
+     "nullable": true,
+     "comment": "Population (people).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "gdp",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Gross domestic product, international-$ at 2011 prices (Maddison Project). Available up to 2022 only.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "primary_energy_consumption",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Primary energy consumption, terawatt-hours (TWh).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "energy_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Primary energy consumption per person, kilowatt-hours per person (kWh/person).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "energy_per_gdp",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Primary energy consumption per unit of GDP, kilowatt-hours per international-$ (kWh/$).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    }
+   ]
+  },
+  {
+   "schema_name": "public",
+   "name": "ghg_emissions",
+   "kind": "table",
+   "comment": "Yearly greenhouse gas emissions (methane, nitrous oxide, total GHG) and contribution to global warming per entity.",
+   "estimated_rows": null,
+   "columns": [
+    {
+     "name": "country_id",
+     "type": "INTEGER",
+     "nullable": false,
+     "comment": null,
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "year",
+     "type": "SMALLINT",
+     "nullable": false,
+     "comment": "Calendar year.",
+     "primary_key": true,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "methane",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual methane (CH4) emissions, million tonnes of CO2-equivalents (MtCO2e).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "methane_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual methane emissions per person, tonnes of CO2-equivalents per person.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "nitrous_oxide",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual nitrous oxide (N2O) emissions, million tonnes of CO2-equivalents (MtCO2e).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "nitrous_oxide_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Annual nitrous oxide emissions per person, tonnes of CO2-equivalents per person.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "total_ghg",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Total greenhouse gas emissions including land-use change and forestry, million tonnes of CO2-equivalents (MtCO2e). Can be negative.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "total_ghg_excluding_lucf",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Total greenhouse gas emissions excluding land-use change and forestry, million tonnes of CO2-equivalents (MtCO2e).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "ghg_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Total greenhouse gas emissions including land use per person, tonnes of CO2-equivalents per person.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "ghg_excluding_lucf_per_capita",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Total greenhouse gas emissions excluding land use per person, tonnes of CO2-equivalents per person.",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "temperature_change_from_ghg",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Contribution to global mean surface temperature change from all greenhouse gases, degrees Celsius (\u00b0C).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "temperature_change_from_co2",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Contribution to global temperature change from CO2, degrees Celsius (\u00b0C).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "temperature_change_from_ch4",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Contribution to global temperature change from methane, degrees Celsius (\u00b0C).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "temperature_change_from_n2o",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Contribution to global temperature change from nitrous oxide, degrees Celsius (\u00b0C).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    },
+    {
+     "name": "share_of_temperature_change_from_ghg",
+     "type": "NUMERIC",
+     "nullable": true,
+     "comment": "Share of global temperature change from greenhouse gases, percent (%).",
+     "primary_key": false,
+     "sensitive": false,
+     "hints": null
+    }
+   ]
+  }
+ ],
+ "relationships": [
+  {
+   "from_table": "public.co2_emissions",
+   "from_columns": [
+    "country_id"
+   ],
+   "to_table": "public.countries",
+   "to_columns": [
+    "id"
+   ],
+   "inferred": false
+  },
+  {
+   "from_table": "public.country_indicators",
+   "from_columns": [
+    "country_id"
+   ],
+   "to_table": "public.countries",
+   "to_columns": [
+    "id"
+   ],
+   "inferred": false
+  },
+  {
+   "from_table": "public.ghg_emissions",
+   "from_columns": [
+    "country_id"
+   ],
+   "to_table": "public.countries",
+   "to_columns": [
+    "id"
+   ],
+   "inferred": false
+  }
+ ],
+ "notes": []
+}
