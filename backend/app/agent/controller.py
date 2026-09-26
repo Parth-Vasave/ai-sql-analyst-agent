@@ -108,6 +108,7 @@ class AgentController:
             model=call.model,
             prompt_tokens=call.prompt_tokens,
             completion_tokens=call.completion_tokens,
+            attempts=call.attempts,
         )
 
         if generated.sql is None:

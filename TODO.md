@@ -2,12 +2,12 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 2 — Database-agnostic layer + Question → SQL → Result (code complete; real-LLM check pending)
+Milestone 3 — SQL safety validation (Milestone 2 done, verified with the real LLM)
 
 Current Objective
 
-Verify /api/query with the real LLM key, then Milestone 3 (AST SQL validator). Until Milestone 3 the
-read-only database account is the only guard against unsafe SQL: do not expose the API publicly yet.
+Milestone 3 (AST SQL validator), with Milestone 4's LIMIT rewrite in the same change. Until Milestone 3
+the read-only database account is the only guard against unsafe SQL: do not expose the API publicly yet.
 
 ⸻
 
@@ -49,7 +49,9 @@ Goal: the analyst adapts to ANY connected database (not just the OWID demo) and 
 * [x] SQL generator with validated JSON output, told the target SQL dialect (prompt sql-generator/1)
 * [x] Executor: read-only connection, timeout, client-side row cap, error categories
 * [x] POST /api/query with database_id, structured trace, metadata (model, prompt version)
-* [ ] Run against the real LLM (key set in environment; visible from the next session)
+* [x] Run against the real LLM: 11 questions on the full OWID data (see Completed Work)
+* [x] LLM client retries transient provider errors (429/5xx): max 3 attempts, Retry-After honoured,
+      fails fast when the provider asks for a wait over 8 s; attempts recorded in the trace
 
 Later in this track
 * [ ] MySQL adapter (+ CI against MySQL)
@@ -87,6 +89,16 @@ Completed Work
 
 * Milestone 1 (first on AGMARKNET mandi prices, then reworked for OWID CO2 data).
   35 pipeline/database tests + 3 API tests pass. Full dataset loads in ~2 s.
+* Milestone 2 verified end to end (2026-09-26) on local PostgreSQL 16 with the full OWID data:
+  all 100 tests pass with the database suites enabled (35 pipeline + 65 backend; now 70 backend).
+  11 hand-picked questions via POST /api/query, not an evaluation run: 11/11 returned results that
+  match hand-written SQL, including the "no such data" question answered as unanswerable. 8 on
+  gemini-3.8-flash; 3 on gemini-3.5-flash after the 3.8 free quota ran out.
+  Observed: the model once omitted the required LIMIT (the executor's row cap still applied; the
+  Milestone 4 AST rewrite will enforce it); the "average per capita" income-group question was
+  answered from OWID's own aggregate rows, which is a reasonable reading but should become an eval
+  case with explicit ground truth. SQL generation takes 3–16 s on the free tier; schema retrieval
+  ~120 ms, mostly re-reflecting for the fingerprint check (could be cached for a short TTL).
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 
@@ -94,7 +106,9 @@ Completed Work
 
 Current Blockers
 
-None.
+None for Milestone 3. For Milestone 11: the Gemini free tier allowed only 5 requests/min and about 20
+requests per model for gemini-3.8-flash (reached after ~20 calls on 2026-09-26), plus frequent 503s.
+A 50+ question evaluation run needs a paid key, pacing over several days, or another provider.
 
 ⸻
 
@@ -111,7 +125,8 @@ Important Decisions
 * psycopg 3 with plain SQL, no ORM: the schema is small and read-only for the app.
 * Schema via idempotent SQL scripts instead of a migration tool (Alembic not needed yet).
 * LLM: free-tier, OpenAI-compatible provider via httpx (no vendor SDK). Gemini recommended (reachable from
-  the dev environment; Groq is blocked there). Swappable via LLM_BASE_URL / LLM_MODEL.
+  the dev environment; Groq is blocked there). Swappable via LLM_BASE_URL / LLM_MODEL. Default model is
+  gemini-3.8-flash: gemini-2.5-flash is no longer available to new keys (HTTP 404).
 * Deployment target: Vercel (frontend + FastAPI serverless function) with a managed Postgres (e.g. Neon).
   Short-lived DB connections chosen with serverless in mind.
 * Test fixture is an unmodified real extract of the OWID file; malformed cases are built in memory.

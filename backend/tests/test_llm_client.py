@@ -10,13 +10,19 @@ from app.agent.sql_generator import GeneratedSQL
 from app.llm.client import LLMError, OpenAICompatibleClient, ScriptedLLMClient, parse_output
 
 
-def _client(handler) -> OpenAICompatibleClient:
+def _client(handler, sleeps: list[float] | None = None) -> OpenAICompatibleClient:
     return OpenAICompatibleClient(
         "https://llm.example.test/v1",
         SecretStr("sk-secret"),
         "test-model",
         transport=httpx.MockTransport(handler),
+        sleep=(sleeps.append if sleeps is not None else lambda seconds: None),
     )
+
+
+def _sequence(*responses: httpx.Response):
+    remaining = list(responses)
+    return lambda request: remaining.pop(0)
 
 
 def _reply(content: str) -> dict:
@@ -52,6 +58,59 @@ def test_http_errors_do_not_leak_the_response_body_or_key() -> None:
     with pytest.raises(LLMError) as info:
         client.complete_json("s", "u", GeneratedSQL)
     assert "401" in str(info.value) and "sk-secret" not in str(info.value)
+
+
+_OK = '{"sql": "SELECT 1", "explanation": "x"}'
+
+
+def test_transient_errors_are_retried_with_backoff() -> None:
+    sleeps: list[float] = []
+    handler = _sequence(httpx.Response(503), httpx.Response(429), httpx.Response(200, json=_reply(_OK)))
+    output, call = _client(handler, sleeps).complete_json("s", "u", GeneratedSQL)
+    assert output.sql == "SELECT 1"
+    assert call.attempts == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_retry_after_header_is_honoured() -> None:
+    sleeps: list[float] = []
+    handler = _sequence(
+        httpx.Response(429, headers={"Retry-After": "3"}), httpx.Response(200, json=_reply(_OK))
+    )
+    _client(handler, sleeps).complete_json("s", "u", GeneratedSQL)
+    assert sleeps == [3.0]
+
+
+def test_long_retry_after_fails_fast_instead_of_blocking_the_request() -> None:
+    sleeps: list[float] = []
+    handler = _sequence(httpx.Response(429, headers={"Retry-After": "40"}))
+    with pytest.raises(LLMError, match="HTTP 429"):
+        _client(handler, sleeps).complete_json("s", "u", GeneratedSQL)
+    assert sleeps == []
+
+
+def test_retries_are_bounded() -> None:
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(503)
+
+    with pytest.raises(LLMError, match="HTTP 503 after 3 attempts"):
+        _client(handler).complete_json("s", "u", GeneratedSQL)
+    assert len(calls) == 3
+
+
+def test_client_errors_are_not_retried() -> None:
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(404)
+
+    with pytest.raises(LLMError, match="HTTP 404$"):
+        _client(handler).complete_json("s", "u", GeneratedSQL)
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize(

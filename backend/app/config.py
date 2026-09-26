@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     max_rows: int = Field(default=1000, ge=1, le=10_000)
 
     # Any OpenAI-compatible chat-completions endpoint (Groq, Gemini, OpenRouter, Ollama, ...).
-    llm_base_url: str = "https://api.groq.com/openai/v1"
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     llm_api_key: SecretStr | None = None
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "gemini-3.8-flash"
 
     cors_origins: list[str] = ["http://localhost:5173"]
     log_level: str = "INFO"
