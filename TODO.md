@@ -201,6 +201,13 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       profiler path that could reflect schema None; a type narrowing lost behind a boolean.
       No behaviour change (all suites pass). Tests are not type-checked (24 errors, mostly
       loosely typed fixtures); a possible follow-up
+* [x] Replay tests in CI (evaluation/tests/test_replay.py): the evaluation pipeline end to end with
+      scripted LLM replies, on the fixture data. All 55 query questions' ground-truth SQL pass the
+      validator and score correct through runner, agent, scoring and report; a wrong answer scores
+      wrong; repair via validator rejection, database error and result check; retry budget and the
+      same-SQL early stop; clarify / unanswerable / blocked writes / leaked secret; the 28-statement
+      offline safety suite (now in CI). Checked by breaking the scorer and the repair loop: the
+      tests fail. Not an accuracy measurement: never report these numbers as evaluation results
 * [ ] README
 * [x] Request rate limiting on POST /api/query (app/api/rate_limit.py), checked before the agent
       runs: RATE_LIMIT_PER_MINUTE per client address (default 10) and RATE_LIMIT_PER_DAY across

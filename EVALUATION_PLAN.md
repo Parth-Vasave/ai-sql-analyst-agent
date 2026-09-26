@@ -20,7 +20,8 @@ What is in the repository
 * evaluation/safety_sql.py    28 adversarial SQL statements for the offline safety suite
 * evaluation/run.py           resumable runner, one JSON record per question in evaluation/results/
 * evaluation/report.py        metrics from a results file
-* evaluation/tests/           tests of scoring, runner and report (no LLM, no database)
+* evaluation/tests/           tests of scoring, runner and report (no LLM), and the replay tests
+                              (test_replay.py, below; need the disposable test database)
 
 ⸻
 
@@ -98,6 +99,16 @@ from the ground truth's.
     python -m evaluation.run --suite questions --delay 15        # needs LLM_API_KEY
     python -m evaluation.run --suite questions --run-id <id>     # resume after quota or crash
     python -m evaluation.report evaluation/results/<id>.jsonl
+
+Replay tests (CI, every push)
+
+evaluation/tests/test_replay.py runs the pipeline end to end with scripted LLM replies instead of a
+model, against the pipeline's OWID fixture subset: every query question's ground-truth SQL through
+the runner, agent, scoring and report; a wrong answer that must score wrong; the three repair paths
+(validator rejection, database error, result check); the retry budget; clarification, unanswerable,
+blocked writes and a leaked secret; and the offline SQL safety suite. They prove the machinery works
+and that every ground-truth query passes the validator. They say nothing about a model's accuracy:
+never report their numbers as evaluation results.
 
 LLM budget: each question takes one call for the SQL plus up to two repairs, plus one for the
 answer with --answers llm (the default, template, needs none). On the free Gemini tier (about 5

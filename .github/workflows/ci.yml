@@ -97,7 +97,7 @@ jobs:
       - name: Backend tests
         working-directory: backend
         run: python -m pytest -rs | tee "$RUNNER_TEMP/backend.txt"
-      - name: Evaluation tests (no LLM, no database)
+      - name: Evaluation tests (no LLM; replay tests use the database)
         run: python -m pytest evaluation/tests -rs | tee "$RUNNER_TEMP/evaluation.txt"
       - name: No tests skipped
         run: |
