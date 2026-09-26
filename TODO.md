@@ -2,15 +2,15 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 9 — Chart generation (Milestones 3–8 done)
+Milestone 10 — Execution trace + structured logging + request IDs (Milestones 3–9 done)
 
 Current Objective
 
-Milestone 9: choose a chart deterministically from the result's shape (time column -> line, one
-category + one measure -> bar, two measures -> scatter; none for single values or wide tables),
-using the model's chart_suggestion only as a tie-breaker, and return a chart spec (type, x, y,
-series) the frontend can render with Recharts. Before a public deployment still add request rate
-limiting (Milestone 13).
+Milestone 10: a request ID on every request (accepted from X-Request-ID or generated, returned in the
+response header and body), structured JSON logs per request and per agent step (step, status,
+duration, attempt, error category) that never contain secrets, connection URLs or result rows, and
+the trace linked to the request ID. Before a public deployment still add request rate limiting
+(Milestone 13).
 
 ⸻
 
@@ -136,6 +136,17 @@ Milestone 8 — Natural-language answer generation
       reason for any fallback and the ungrounded numbers
 * [ ] Follow-up: give the answer step column units (from column comments) so answers can say "Mt"
 Milestone 9 — Chart generation
+
+* [x] Deterministic chart choice (backend/app/agent/chart.py) from column kinds (temporal, measure,
+      category, identifier) and values: single value -> stat tile; time -> line (one line per
+      category, max 8); categories -> bar (horizontal when many or long labels, max 30); two
+      measures -> scatter; otherwise none (the table always carries the result)
+* [x] One value axis only: measures more than 10x apart in scale are not plotted together
+* [x] The model's chart_suggestion is only a tie-breaker (bars for <= 6 time points, scatter for
+      two measures per category); ChartSpec (type, x, y, series, label, orientation, reason) in the
+      response, chart_selection trace step
+* [x] Tests: column kinds, every form rule, limits, tie-breaks; checked on the 10 real LLM queries
+      plus a multi-series trend and a GDP-vs-CO2 scatter on the full OWID data
 Milestone 10 — Execution trace + structured logging + request IDs
 Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safety suite)
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
@@ -180,6 +191,10 @@ Completed Work
   "top 5 emitters in 2023" in grounded prose (all five figures from the rows, but without units); on
   gemini-3.8-flash a 429 on the answer call fell back to the template answer while the request still
   succeeded. The other 4 of 6 live requests failed with 429 (free-tier quota) at SQL generation.
+* Milestone 9 (2026-09-26): 266 backend + 35 pipeline tests pass. No LLM needed: chart choice on 12
+  real results from the full data gave horizontal bars for rankings, stat tiles for single values, a
+  line for India's CO2 trend (growth columns left to the table: different scale), three lines for a
+  3-country trend and a scatter for GDP vs CO2.
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 

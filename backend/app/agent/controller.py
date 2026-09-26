@@ -1,5 +1,5 @@
 """Orchestrates one question: schema retrieval -> plan + SQL generation -> validation ->
-execution -> result checks.
+execution -> result checks -> answer and chart.
 
 A repairable failure (validator rejection, database error, or a result check such as a
 misspelled filter value) is fed back to the model for a corrected query, at most max_retries
@@ -7,7 +7,7 @@ times; every repaired query is validated again. If a repair ends worse than an e
 executed result, that earlier result is returned.
 
 Each step appends a structured TraceEvent (what happened, how long it took, key outputs),
-never the model's reasoning. Later milestones add answer and chart steps.
+never the model's reasoning.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from app.agent.answer import (
     template_answer,
     ungrounded_numbers,
 )
+from app.agent.chart import ChartSpec, choose_chart
 from app.agent.executor import QueryExecutionError, QueryResult, execute
 from app.agent.result_checks import ResultCheck, check_result, is_empty, probe_missing_values
 from app.agent.schema_retriever import build_context
@@ -81,7 +82,8 @@ class AgentResult(BaseModel):
     sql: str | None = None
     columns: list[str] = []
     rows: list[list[Any]] = []
-    chart_suggestion: str | None = None
+    chart_suggestion: str | None = None  # the model's suggestion (a tie-breaker only)
+    chart: ChartSpec | None = None  # the chart chosen deterministically from the result (Milestone 9)
     checks: list[ResultCheck] = []  # deterministic result checks (Milestone 7)
     error: QueryError | None = None
     trace: list[TraceEvent] = []
@@ -166,6 +168,11 @@ class AgentController:
                 outcome.metadata.retry_count = meta.retry_count
             if outcome.status == "success":
                 self._answer(outcome, connection, trace)
+                with trace.timed() as ms:
+                    outcome.chart = choose_chart(outcome.columns, outcome.rows, outcome.chart_suggestion)
+                trace.record(
+                    "chart_selection", duration_ms=ms[0], type=outcome.chart.type, reason=outcome.chart.reason
+                )
             status = "failed" if outcome.status == "error" else "success"
             trace.record("completed", status, retries=meta.retry_count, **detail)
             outcome.trace = trace.events

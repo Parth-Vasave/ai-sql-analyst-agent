@@ -105,7 +105,7 @@ def test_question_to_sql_to_result(shop) -> None:
     assert result.chart_suggestion == "bar"
     assert [e.step for e in result.trace] == [
         "question_received", "schema_retrieval", "sql_generation", "sql_validation", "query_execution",
-        "result_validation", "answer_generation", "completed",
+        "result_validation", "answer_generation", "chart_selection", "completed",
     ]  # fmt: skip
     system, user = llm.calls[0]
     assert "postgres SQL" in system and "LIMIT 100" in system
@@ -239,7 +239,8 @@ def test_validation_rejection_is_repaired(shop) -> None:
         ("question_received", "success"), ("schema_retrieval", "success"),
         ("sql_generation", "success"), ("sql_validation", "failed"),
         ("sql_repair", "success"), ("sql_validation", "success"), ("query_execution", "success"),
-        ("result_validation", "success"), ("answer_generation", "skipped"), ("completed", "success"),
+        ("result_validation", "success"), ("answer_generation", "skipped"),
+        ("chart_selection", "success"), ("completed", "success"),
     ]  # fmt: skip
     repair_prompt = llm.calls[1][1]
     assert "SELECT states, count(*)" in repair_prompt  # the failed SQL
@@ -444,3 +445,19 @@ def test_no_answer_step_for_errors(shop) -> None:
     llm = sequence(reply("DELETE FROM shop.orders"))
     result = AgentController(llm, max_rows=100, answer_llm=answer_llm).run("?", shop)
     assert result.status == "error" and result.answer is None and answer_llm.calls == []
+
+
+def test_chart_is_chosen_for_the_result(shop) -> None:
+    result = AgentController(sequence(reply(STATUS_SQL, chart="line")), max_rows=100).run(
+        "Orders per status?", shop
+    )
+    assert result.chart is not None
+    assert (result.chart.type, result.chart.x, result.chart.y) == ("bar", "status", ["orders"])
+    assert result.chart_suggestion == "line"  # the model's suggestion is kept, but did not decide
+    step = next(e for e in result.trace if e.step == "chart_selection")
+    assert step.detail["type"] == "bar"
+
+
+def test_no_chart_for_errors(shop) -> None:
+    result = AgentController(sequence(reply("DELETE FROM shop.orders")), max_rows=100).run("?", shop)
+    assert result.chart is None and "chart_selection" not in [e.step for e in result.trace]
