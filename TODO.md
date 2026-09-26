@@ -218,9 +218,13 @@ Completed Work
 
 Current Blockers
 
-None for Milestone 3. For Milestone 11: the Gemini free tier allowed only 5 requests/min and about 20
-requests per model for gemini-3.8-flash (reached after ~20 calls on 2026-09-26), plus frequent 503s.
-A 50+ question evaluation run needs a paid key, pacing over several days, or another provider.
+Milestone 11 needs LLM quota. Status on 2026-09-26: the environment's LLM_MODEL is gemini-3.5-flash
+(the retired gemini-2.5-flash setting is fixed; the code default stays gemini-3.8-flash). A direct
+call succeeds, but the free tier caps each model at about 20 requests per day (the 429 names
+generate_content_free_tier_requests, limit 20) and 5 per minute, with frequent 503s; the day's quota
+was used up by live checks. Each evaluation question can take up to 4 calls (SQL, 2 repairs, answer;
+ANSWER_MODE=template saves one), so a 50+ question run needs billing on the key, batches over several
+days, or another provider. Building the question set, ground truth and runner needs no LLM calls.
 
 ⸻
 
