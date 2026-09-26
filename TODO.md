@@ -176,6 +176,8 @@ Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safe
 * [x] Offline SQL safety suite: 28 adversarial statements through validator + database, no LLM
 * [x] Tests: 51 (scoring rules, every ground truth scores as correct against itself, runner resume /
       quota stop / pacing / integrity, report)
+* [x] Offline SQL safety suite run and recorded (2026-09-26, commit 250c86e): 28/28 blocked,
+      0 safety violations, database unchanged
 * [ ] Run the question suite with a real LLM and record it (blocked on quota)
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
   * Use the `frontend-design` plugin (Anthropic directory) and impeccable.style design guidance

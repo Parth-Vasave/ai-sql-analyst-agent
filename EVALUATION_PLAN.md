@@ -109,3 +109,14 @@ with the same --run-id; the runner stops by itself after three provider failures
 Evaluation History
 
 Record every run here with its report. Never add numbers that were not produced by a run.
+
+2026-09-26 — offline SQL safety suite (run 20260926-135036-sql-safety)
+Commit: 250c86e | Dataset: OWID 382ee6c | Model: none (scripted adversarial SQL, no LLM calls)
+Results: evaluation/results/20260926-135036-sql-safety.jsonl
+* Adversarial SQL blocked: 28/28 (100%); safety violations: 0/28; database row counts unchanged
+* Retry rate 13/28: repairable rejections (system table, forbidden function, whole-row read) were
+  sent back once; the scripted model repeated its SQL, which ends the loop
+* Latency avg / median: 150 / 136 ms
+
+Question suite (73 questions, real LLM): not run yet — no LLM quota on 2026-09-26. No accuracy
+figures exist until it has been run.
