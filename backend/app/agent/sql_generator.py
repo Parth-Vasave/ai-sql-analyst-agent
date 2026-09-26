@@ -8,6 +8,7 @@ user and checked deterministically against the validated SQL (see check_plan).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
@@ -92,6 +93,64 @@ def generate_sql(
 ) -> tuple[GeneratedSQL, LLMCall]:
     system = SYSTEM_PROMPT.format(dialect=dialect, max_rows=max_rows)
     return llm.complete_json(system, build_user_prompt(question, context), GeneratedSQL)
+
+
+REPAIR_PROMPT_VERSION = "sql-repair/1"
+
+_REPAIR_HINTS = {
+    "timeout": (
+        "The query was cancelled because it ran longer than the time limit. Write a cheaper query: "
+        "filter as early as possible, avoid cross joins and correlated subqueries, aggregate fewer rows."
+    ),
+    "unknown_column": "Use only columns listed in the schema, with the table they belong to.",
+    "undefined_column": "Use only columns listed in the schema, with the table they belong to.",
+    "unknown_table": "Use only tables listed in the schema.",
+    "undefined_table": "Use only tables listed in the schema.",
+    "star": "Name the columns you need instead of using *.",
+    "whole_row": "Select individual columns, not a whole table row.",
+}
+
+
+@dataclass(frozen=True)
+class FailedAttempt:
+    """What went wrong with the previous SQL, as fed back to the model for repair."""
+
+    sql: str
+    stage: Literal["validation", "execution"]
+    reason: str  # validator rejection code or database error category
+    message: str
+    plan: QueryPlan | None = None
+
+
+def build_repair_prompt(question: str, context: SchemaContext, failed: FailedAttempt) -> str:
+    stage = "was rejected by the SQL safety validator" if failed.stage == "validation" else "failed"
+    parts = [
+        build_user_prompt(question, context),
+        "",
+        "Your previous plan:",
+        failed.plan.model_dump_json() if failed.plan else "(none)",
+        "",
+        "Your previous SQL:",
+        failed.sql,
+        "",
+        f"It {stage} ({failed.reason}): {failed.message}",
+    ]
+    if failed.reason in _REPAIR_HINTS:
+        parts.append(_REPAIR_HINTS[failed.reason])
+    parts.append("Reply with a corrected JSON object in the same format. Do not repeat the same SQL.")
+    return "\n".join(parts)
+
+
+def repair_sql(
+    llm: LLMClient,
+    question: str,
+    context: SchemaContext,
+    dialect: str,
+    max_rows: int,
+    failed: FailedAttempt,
+) -> tuple[GeneratedSQL, LLMCall]:
+    system = SYSTEM_PROMPT.format(dialect=dialect, max_rows=max_rows)
+    return llm.complete_json(system, build_repair_prompt(question, context, failed), GeneratedSQL)
 
 
 def _bare(name: str) -> str:

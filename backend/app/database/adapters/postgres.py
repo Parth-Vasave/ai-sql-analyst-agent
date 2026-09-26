@@ -95,6 +95,8 @@ class PostgresAdapter(DatabaseAdapter):
             return _SQLSTATE[sqlstate]
         if sqlstate and sqlstate.startswith("42"):
             return ErrorCategory.SYNTAX
+        if sqlstate and sqlstate.startswith("22"):  # class 22: data exceptions
+            return ErrorCategory.DATA_ERROR
         return ErrorCategory.OTHER
 
     def readable_tables(self, conn: Connection, schema: str) -> set[str] | None:

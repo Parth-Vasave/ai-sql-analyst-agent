@@ -2,15 +2,14 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 6 — Automatic SQL repair/retry (Milestones 3 and 5 done)
+Milestone 7 — Result validation (Milestones 3–6 done)
 
 Current Objective
 
-Milestone 6 (repair/retry, max MAX_RETRIES). The validator's rejection codes and the executor's error
-categories are the inputs for repair; Milestone 4's "retry a timed-out query with a cheaper one"
-belongs to that same loop. The plan (Milestone 5) gives the repair prompt the intended query shape.
-Both safety layers (read-only account + SQL validator) are in place; before a public deployment
-still add request rate limiting (Milestone 13).
+Milestone 7: deterministic checks on query results (empty results, NULL-only columns, suspicious
+magnitudes, truncation) that feed the answer step and, where useful, the repair loop. Both safety
+layers (read-only account + SQL validator) are in place; before a public deployment still add request
+rate limiting (Milestone 13).
 
 ⸻
 
@@ -84,7 +83,7 @@ Milestone 4 — Read-only user + timeout + LIMIT enforcement
 * [x] Read-only role and database-level timeout (done early in Milestone 1)
 * [x] LIMIT enforcement by AST rewrite: added when missing, clamped to MAX_ROWS (also FETCH FIRST);
       non-literal LIMIT rejected. The executor's client-side row cap stays as a second guard.
-* [ ] Timeout surfaced as a trace event with retry for a cheaper query
+* [x] Timeout surfaced as a trace event with retry for a cheaper query (done in Milestone 6)
 
 Milestone 5 — Query planner
 
@@ -97,6 +96,18 @@ Milestone 5 — Query planner
 * [x] Plan returned in the API response and its intent in the trace; tests for parsing, the
       SQL-or-question rule, the plan check and the clarification path
 Milestone 6 — Automatic SQL repair/retry (max 2)
+
+* [x] Repair loop in the controller: a repairable failure is fed back to the model (prompt
+      sql-repair/1: failed SQL, reason code, error message, previous plan, targeted hint) at most
+      MAX_RETRIES times; every repaired query is validated again
+* [x] Repairable: validator rejections except NOT_SELECT / FORBIDDEN_OPERATION / MULTIPLE_STATEMENTS
+      (unsafe intent is not retried); database errors timeout, syntax, undefined column/table/function,
+      type mismatch, data errors (new category: PostgreSQL class 22, e.g. division by zero)
+* [x] Timeout repair asks for a cheaper query; the loop stops early when the model repeats its SQL
+* [x] Trace: sql_repair steps, attempt number on every step, retries on completion; retry_count in
+      metadata; the last failed SQL and its plan are returned on error
+* [x] Tests: repair after rejection / database error / division by zero / timeout, bounded retries,
+      repeated SQL, unsafe SQL not retried, repair ending in clarification, retries disabled
 Milestone 7 — Result validation (deterministic checks)
 Milestone 8 — Natural-language answer generation
 Milestone 9 — Chart generation
@@ -131,6 +142,11 @@ Completed Work
   "Show me the data for Georgia" were answered with stated assumptions (latest-year annual CO2; the
   country Georgia) rather than a clarification question. The clarification path is so far covered by
   tests only; Milestone 11's ambiguous-question category will measure it.
+* Milestone 6 (2026-09-26): 184 backend + 35 pipeline tests pass. Live (gemini-3.6-flash): two
+  division-prone questions were answered first time (the model guarded against zero itself), so the
+  real repair step was exercised directly with two constructed failures: division by zero was
+  repaired with NULLIF, an unknown column with real emissions columns; both repairs validated and
+  returned correct rows.
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 

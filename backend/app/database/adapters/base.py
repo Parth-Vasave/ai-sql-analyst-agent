@@ -26,6 +26,7 @@ class ErrorCategory(StrEnum):
     UNDEFINED_TABLE = "undefined_table"
     UNDEFINED_FUNCTION = "undefined_function"
     TYPE_MISMATCH = "type_mismatch"
+    DATA_ERROR = "data_error"  # e.g. division by zero, value out of range
     PERMISSION = "permission"
     READ_ONLY = "read_only"
     OTHER = "other"

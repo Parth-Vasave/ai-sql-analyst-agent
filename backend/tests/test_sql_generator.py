@@ -69,3 +69,31 @@ def test_prompt_asks_for_plan_assumptions_and_sparing_clarification() -> None:
     prompt = SYSTEM_PROMPT.format(dialect="postgres", max_rows=100)
     assert '"plan"' in prompt and '"assumptions"' in prompt and '"clarification_question"' in prompt
     assert "reasonable default" in prompt and "LIMIT 100" in prompt
+
+
+def test_repair_prompt_contains_the_failure_and_a_hint() -> None:
+    from app.agent.schema_retriever import SchemaContext
+    from app.agent.sql_generator import FailedAttempt, build_repair_prompt
+
+    failed = FailedAttempt(
+        sql="SELECT slow FROM t",
+        stage="execution",
+        reason="timeout",
+        message="canceling statement due to statement timeout",
+        plan=QueryPlan.model_validate(PLAN),
+    )
+    prompt = build_repair_prompt("How much?", SchemaContext(tables=[], text="TABLE t"), failed)
+    assert prompt.startswith("Schema:\nTABLE t\n\nQuestion: How much?")
+    assert "SELECT slow FROM t" in prompt and "failed (timeout)" in prompt
+    assert "cheaper query" in prompt and '"intent":"ranking"' in prompt
+    assert "Do not repeat the same SQL" in prompt
+
+
+def test_validation_failure_is_described_as_a_rejection() -> None:
+    from app.agent.schema_retriever import SchemaContext
+    from app.agent.sql_generator import FailedAttempt, build_repair_prompt
+
+    failed = FailedAttempt("SELECT * FROM t", "validation", "star", "SELECT * is not allowed")
+    prompt = build_repair_prompt("q", SchemaContext(tables=[], text=""), failed)
+    assert "rejected by the SQL safety validator (star)" in prompt and "Name the columns" in prompt
+    assert "Your previous plan:\n(none)" in prompt
