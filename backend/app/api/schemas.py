@@ -37,6 +37,11 @@ class DatabaseInfo(BaseModel):
         )
 
 
+class QueryRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    database_id: str | None = None  # defaults to the first ready database
+
+
 class AddDatabaseRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     url: SecretStr

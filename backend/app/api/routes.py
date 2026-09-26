@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.api.schemas import AddDatabaseRequest, DatabaseInfo, HealthResponse
+from app.agent.controller import AgentController, AgentResult
+from app.api.schemas import AddDatabaseRequest, DatabaseInfo, HealthResponse, QueryRequest
 from app.config import Settings, get_settings
 from app.database.connections import (
     ConnectionConfig,
@@ -31,6 +32,34 @@ def _get_connection(registry: ConnectionRegistry, database_id: str) -> DatabaseC
         return registry.get(database_id)
     except KeyError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown database {database_id!r}") from None
+
+
+def get_agent(request: Request, settings: Annotated[Settings, Depends(get_settings)]) -> AgentController:
+    llm = request.app.state.llm
+    if llm is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No LLM configured: set LLM_API_KEY.")
+    return AgentController(llm, max_rows=settings.max_rows)
+
+
+@router.post("/query", response_model=AgentResult)
+def query(
+    body: QueryRequest, registry: Registry, agent: Annotated[AgentController, Depends(get_agent)]
+) -> AgentResult:
+    if body.database_id is not None:
+        connection = _get_connection(registry, body.database_id)
+    else:
+        ready = [
+            c
+            for c in registry.all()
+            if c.status is ConnectionStatus.READY or c.verify() is ConnectionStatus.READY
+        ]
+        if not ready:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No database is ready.")
+        connection = ready[0]
+    try:
+        return agent.run(body.question.strip(), connection)
+    except DatabaseNotReadyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
 
 @router.get("/health", response_model=HealthResponse)

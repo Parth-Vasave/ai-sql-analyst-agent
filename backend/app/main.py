@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.config import get_settings
 from app.database.connections import build_registry
+from app.llm.client import OpenAICompatibleClient
 
 
 @asynccontextmanager
@@ -23,6 +24,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         environ=dict(os.environ),
     )
     app.state.registry = registry
+    app.state.llm = (
+        OpenAICompatibleClient(settings.llm_base_url, settings.llm_api_key, settings.llm_model)
+        if settings.llm_api_key and settings.llm_api_key.get_secret_value()
+        else None
+    )
     yield
     for connection in registry.all():
         connection.dispose()

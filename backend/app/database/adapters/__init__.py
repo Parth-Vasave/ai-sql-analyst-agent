@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.database.adapters.base import DatabaseAdapter, PrivilegeReport
+from app.database.adapters.base import DatabaseAdapter, ErrorCategory, PrivilegeReport
 from app.database.adapters.postgres import PostgresAdapter
 
 _ADAPTERS: dict[str, type[DatabaseAdapter]] = {"postgresql": PostgresAdapter}
@@ -22,6 +22,7 @@ def get_adapter(backend: str) -> DatabaseAdapter:
 
 __all__ = [
     "DatabaseAdapter",
+    "ErrorCategory",
     "PrivilegeReport",
     "SUPPORTED_BACKENDS",
     "UnsupportedDatabaseError",

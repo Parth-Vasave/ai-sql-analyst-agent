@@ -9,11 +9,26 @@ row-count estimates. Adding an engine (e.g. MySQL) means adding one adapter.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import Connection
 from sqlalchemy.engine import URL
+
+
+class ErrorCategory(StrEnum):
+    """Engine-independent classes of query failure, used to decide on repair and retries."""
+
+    TIMEOUT = "timeout"
+    SYNTAX = "syntax"
+    UNDEFINED_COLUMN = "undefined_column"
+    UNDEFINED_TABLE = "undefined_table"
+    UNDEFINED_FUNCTION = "undefined_function"
+    TYPE_MISMATCH = "type_mismatch"
+    PERMISSION = "permission"
+    READ_ONLY = "read_only"
+    OTHER = "other"
 
 
 class PrivilegeReport(BaseModel):
@@ -57,6 +72,10 @@ class DatabaseAdapter(ABC):
     def readable_tables(self, conn: Connection, schema: str) -> set[str] | None:
         """Tables/views the account can SELECT from; None if the engine cannot tell."""
         return None
+
+    def classify_error(self, error: BaseException) -> ErrorCategory:
+        """Map a driver exception to an ErrorCategory."""
+        return ErrorCategory.OTHER
 
     def estimate_row_counts(self, conn: Connection, schema: str) -> dict[str, int]:
         """Cheap (catalog-based) row-count estimates; empty if unavailable."""

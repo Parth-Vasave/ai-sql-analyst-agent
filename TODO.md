@@ -2,11 +2,12 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 2 — Database-agnostic layer (2a done) → Question → SQL → Result (2b next)
+Milestone 2 — Database-agnostic layer + Question → SQL → Result (code complete; real-LLM check pending)
 
 Current Objective
 
-2b: LLM client, SQL generation told the target dialect, executor, POST /api/query. Needs the LLM provider decision + API key.
+Verify /api/query with the real LLM key, then Milestone 3 (AST SQL validator). Until Milestone 3 the
+read-only database account is the only guard against unsafe SQL: do not expose the API publicly yet.
 
 ⸻
 
@@ -42,9 +43,13 @@ Goal: the analyst adapts to ANY connected database (not just the OWID demo) and 
 * [x] Tests on two differently shaped schemas
 
 2b. Question → SQL → Result
-* [ ] LLM client abstraction (OpenAI-compatible; scripted fake client for tests)
-* [ ] SQL generator with structured JSON output, told the target SQL dialect
-* [ ] Executor (read-only connection, timeout) + POST /api/query with database_id
+* [x] LLM client abstraction (OpenAI-compatible over httpx; scripted client for tests)
+* [x] Schema retriever: keyword retrieval (+ join neighbours), whole schema when small,
+      sensitive columns never rendered
+* [x] SQL generator with validated JSON output, told the target SQL dialect (prompt sql-generator/1)
+* [x] Executor: read-only connection, timeout, client-side row cap, error categories
+* [x] POST /api/query with database_id, structured trace, metadata (model, prompt version)
+* [ ] Run against the real LLM (key set in environment; visible from the next session)
 
 Later in this track
 * [ ] MySQL adapter (+ CI against MySQL)
@@ -105,8 +110,8 @@ Important Decisions
 * Seeding/ingestion use a separate owner account (ADMIN_DATABASE_URL); the API never gets it.
 * psycopg 3 with plain SQL, no ORM: the schema is small and read-only for the app.
 * Schema via idempotent SQL scripts instead of a migration tool (Alembic not needed yet).
-* LLM: free-tier, OpenAI-compatible provider (default Groq, llama-3.3-70b-versatile); swappable via
-  LLM_BASE_URL / LLM_MODEL (Gemini, OpenRouter, local Ollama). To confirm before Milestone 2.
+* LLM: free-tier, OpenAI-compatible provider via httpx (no vendor SDK). Gemini recommended (reachable from
+  the dev environment; Groq is blocked there). Swappable via LLM_BASE_URL / LLM_MODEL.
 * Deployment target: Vercel (frontend + FastAPI serverless function) with a managed Postgres (e.g. Neon).
   Short-lived DB connections chosen with serverless in mind.
 * Test fixture is an unmodified real extract of the OWID file; malformed cases are built in memory.

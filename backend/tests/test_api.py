@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 
 import pytest
@@ -8,6 +9,7 @@ from pydantic import SecretStr
 
 from app.config import Settings, get_settings
 from app.database.connections import ConnectionConfig, ConnectionRegistry
+from app.llm.client import ScriptedLLMClient
 from app.main import app
 
 
@@ -20,6 +22,7 @@ def registry() -> ConnectionRegistry:
 def client(registry: ConnectionRegistry) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         app.state.registry = registry  # replace the one built from the environment
+        app.state.llm = None
         yield test_client
     app.dependency_overrides.clear()
 
@@ -100,3 +103,30 @@ def test_adding_writable_account_is_rejected(pg, client: TestClient, registry: C
     assert response.status_code == 422
     assert "modify tables" in response.text
     assert registry.all() == []
+
+
+def test_query_without_llm_is_503(client: TestClient) -> None:
+    response = client.post("/api/query", json={"question": "anything"})
+    assert response.status_code == 503
+    assert "LLM_API_KEY" in response.json()["detail"]
+
+
+def test_query_validates_input(client: TestClient) -> None:
+    app.state.llm = ScriptedLLMClient(lambda s, u: "{}")
+    assert client.post("/api/query", json={"question": ""}).status_code == 422
+    assert client.post("/api/query", json={"question": "x" * 501}).status_code == 422
+
+
+def test_query_end_to_end(pg, client: TestClient, registry: ConnectionRegistry) -> None:
+    registry.add(ConnectionConfig(id="shop", name="Shop", url=SecretStr(pg.agent), schemas=["shop"]))
+    sql = (
+        "SELECT segment, count(*) AS customers FROM shop.customers GROUP BY segment ORDER BY segment LIMIT 10"
+    )
+    reply = json.dumps({"sql": sql, "explanation": "Customers per segment.", "chart_suggestion": "bar"})
+    app.state.llm = ScriptedLLMClient(lambda s, u: reply)
+    response = client.post("/api/query", json={"question": "Customers per segment?", "database_id": "shop"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "success"
+    assert body["rows"] == [["online", 8], ["retail", 8], ["wholesale", 9]]
+    assert body["metadata"]["model"] == "scripted" and body["metadata"]["row_count"] == 3

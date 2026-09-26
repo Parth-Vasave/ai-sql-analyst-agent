@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 from sqlalchemy.engine import URL
 
-from app.database.adapters.base import DatabaseAdapter, PrivilegeReport
+from app.database.adapters.base import DatabaseAdapter, ErrorCategory, PrivilegeReport
 
 _SYSTEM_SCHEMAS = "('pg_catalog', 'information_schema')"
 
@@ -27,6 +27,20 @@ _CREATABLE_SCHEMAS = text(f"""
       AND has_schema_privilege(oid, 'CREATE')
     ORDER BY 1
 """)
+
+
+# SQLSTATE codes: https://www.postgresql.org/docs/current/errcodes-appendix.html
+_SQLSTATE: dict[str, ErrorCategory] = {
+    "57014": ErrorCategory.TIMEOUT,  # query_canceled (statement_timeout)
+    "42601": ErrorCategory.SYNTAX,
+    "42703": ErrorCategory.UNDEFINED_COLUMN,
+    "42P01": ErrorCategory.UNDEFINED_TABLE,
+    "42883": ErrorCategory.UNDEFINED_FUNCTION,
+    "42804": ErrorCategory.TYPE_MISMATCH,
+    "22P02": ErrorCategory.TYPE_MISMATCH,
+    "42501": ErrorCategory.PERMISSION,
+    "25006": ErrorCategory.READ_ONLY,
+}
 
 
 class PostgresAdapter(DatabaseAdapter):
@@ -74,6 +88,14 @@ class PostgresAdapter(DatabaseAdapter):
         if conn.execute(text("SELECT has_database_privilege(current_database(), 'TEMP')")).scalar():
             report.warnings.append("account can create temporary tables")
         return report
+
+    def classify_error(self, error: BaseException) -> ErrorCategory:
+        sqlstate = getattr(getattr(error, "orig", error), "sqlstate", None)
+        if sqlstate in _SQLSTATE:
+            return _SQLSTATE[sqlstate]
+        if sqlstate and sqlstate.startswith("42"):
+            return ErrorCategory.SYNTAX
+        return ErrorCategory.OTHER
 
     def readable_tables(self, conn: Connection, schema: str) -> set[str] | None:
         rows = conn.execute(
