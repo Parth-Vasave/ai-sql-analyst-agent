@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from app.api.rate_limit import RateLimiter
 from app.config import Settings, get_settings
 from app.database.connections import ConnectionConfig, ConnectionRegistry
 from app.llm.client import ScriptedLLMClient
@@ -115,6 +116,39 @@ def test_query_validates_input(client: TestClient) -> None:
     app.state.llm = ScriptedLLMClient(lambda s, u: "{}")
     assert client.post("/api/query", json={"question": ""}).status_code == 422
     assert client.post("/api/query", json={"question": "x" * 501}).status_code == 422
+
+
+def test_query_is_rate_limited_before_the_agent_runs(client: TestClient) -> None:
+    app.state.rate_limiter = RateLimiter(2, 0)
+    # No LLM is configured, so requests that get through are 503s; the limit is checked first.
+    assert [client.post("/api/query", json={"question": "q"}).status_code for _ in range(2)] == [503, 503]
+    limited = client.post("/api/query", json={"question": "q"})
+    assert limited.status_code == 429
+    assert 1 <= int(limited.headers["Retry-After"]) <= 60
+    assert limited.json()["detail"].startswith("Too many questions from this client.")
+    assert client.get("/api/health").status_code != 429  # only the query endpoint is limited
+
+
+def test_global_query_budget(client: TestClient) -> None:
+    app.state.rate_limiter = RateLimiter(0, 1)
+    client.post("/api/query", json={"question": "q"})
+    limited = client.post("/api/query", json={"question": "q"})
+    assert limited.status_code == 429
+    assert "question budget" in limited.json()["detail"]
+
+
+def test_forwarded_for_identifies_clients_only_behind_a_trusted_proxy(client: TestClient) -> None:
+    def post_from(address: str) -> int:
+        headers = {"X-Forwarded-For": address}
+        return client.post("/api/query", json={"question": "q"}, headers=headers).status_code
+
+    app.state.rate_limiter = RateLimiter(1, 0)
+    assert [post_from("203.0.113.1"), post_from("203.0.113.2")] == [503, 429]  # header ignored
+
+    trusted = Settings(trusted_proxy_hops=1)
+    app.dependency_overrides[get_settings] = lambda: trusted
+    app.state.rate_limiter = RateLimiter(1, 0)
+    assert [post_from("203.0.113.1"), post_from("203.0.113.2"), post_from("203.0.113.1")] == [503, 503, 429]
 
 
 def test_query_end_to_end(pg, client: TestClient, registry: ConnectionRegistry) -> None:

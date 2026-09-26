@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.agent.controller import AgentController, AgentResult
+from app.api.rate_limit import RateLimiter, client_address
 from app.api.schemas import AddDatabaseRequest, DatabaseInfo, HealthResponse, QueryRequest
 from app.config import Settings, get_settings
 from app.database.connections import (
@@ -16,8 +18,10 @@ from app.database.connections import (
     UnsupportedDatabaseError,
 )
 from app.database.profile import DatabaseProfile
+from app.observability import log_event
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger("app.api")
 
 
 def get_registry(request: Request) -> ConnectionRegistry:
@@ -46,7 +50,33 @@ def get_agent(request: Request, settings: Annotated[Settings, Depends(get_settin
     )
 
 
-@router.post("/query", response_model=AgentResult)
+def rate_limit(request: Request, settings: Annotated[Settings, Depends(get_settings)]) -> None:
+    limiter: RateLimiter = request.app.state.rate_limiter
+    decision = limiter.hit(client_address(request, settings.trusted_proxy_hops))
+    if decision.allowed:
+        return
+    # The client address is not logged: the scope and wait are enough to see limits being hit.
+    log_event(
+        logger,
+        "rate limited",
+        logging.WARNING,
+        scope=decision.scope,
+        retry_after_seconds=decision.retry_after_seconds,
+    )
+    message = (
+        "Too many questions from this client."
+        if decision.scope == "client"
+        else "The service's question budget is used up for now."
+    )
+    raise HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        f"{message} Try again in {decision.retry_after_seconds} s.",
+        headers={"Retry-After": str(decision.retry_after_seconds)},
+    )
+
+
+# Rate limiting runs first, so a limited request never reaches the LLM.
+@router.post("/query", response_model=AgentResult, dependencies=[Depends(rate_limit)])
 def query(
     body: QueryRequest, registry: Registry, agent: Annotated[AgentController, Depends(get_agent)]
 ) -> AgentResult:

@@ -9,8 +9,8 @@ Current Objective
 Run the question suite (python -m evaluation.run --suite questions) and record the report in
 EVALUATION_PLAN.md's Evaluation History. On the free Gemini tier this takes daily batches resumed
 with --run-id; with billing on the key it is one run. Never record numbers that were not produced by
-a run. Then Milestone 12 (frontend). Before a public deployment still add request rate limiting
-(Milestone 13).
+a run. Then Milestone 12 (frontend). Rate limiting is in (Milestone 13); for a serverless
+deployment it needs a shared store.
 
 ⸻
 
@@ -196,7 +196,17 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       the integration tests cannot silently drop out. The offline SQL safety suite is not in CI: it
       needs the full pinned OWID data (row-count check), which is not committed
 * [ ] README
-* [ ] Request rate limiting (before any public deployment)
+* [x] Request rate limiting on POST /api/query (app/api/rate_limit.py), checked before the agent
+      runs: RATE_LIMIT_PER_MINUTE per client address (default 10) and RATE_LIMIT_PER_DAY across
+      all clients (default 200, the ceiling on LLM spend even if a caller rotates addresses).
+      Sliding windows; refused requests do not count; 429 with Retry-After and a "rate limited"
+      log event (scope and wait, never the address). X-Forwarded-For is used only for
+      TRUSTED_PROXY_HOPS proxies, and only the entries they appended. 15 tests; live check on
+      uvicorn: the 4th request with a limit of 3 got 429, Retry-After: 60.
+      Limitation: in memory, per process. For serverless or multi-instance deployments (Vercel)
+      the limits must move to a shared store, to be decided with the deployment
+* [ ] Uvicorn's default access log records client IPs; the app already logs requests without
+      them (observability.py). Consider --no-access-log in backend/Dockerfile
 * [ ] Docker check from a clean start
 * [ ] Deployment (Vercel + Neon), after the frontend
 

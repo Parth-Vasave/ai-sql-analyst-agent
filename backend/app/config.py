@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_model: str = "gemini-3.8-flash"
 
+    # Limits on POST /api/query, the endpoint that spends LLM quota (see app/api/rate_limit.py).
+    # 0 turns a limit off. Per process: several workers or instances each enforce their own.
+    rate_limit_per_minute: int = Field(default=10, ge=0, le=10_000)  # per client address
+    rate_limit_per_day: int = Field(default=200, ge=0, le=1_000_000)  # all clients together
+    # Reverse proxies in front of the app that append the client address to X-Forwarded-For
+    # (1 behind a single load balancer). 0: rate-limit by the TCP peer and ignore the header,
+    # which any client can set.
+    trusted_proxy_hops: int = Field(default=0, ge=0, le=5)
+
     cors_origins: list[str] = ["http://localhost:5173"]
     log_level: str = "INFO"
 

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.rate_limit import RateLimiter
 from app.api.routes import router
 from app.config import get_settings
 from app.database.connections import build_registry
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if settings.llm_api_key and settings.llm_api_key.get_secret_value()
         else None
     )
+    app.state.rate_limiter = RateLimiter(settings.rate_limit_per_minute, settings.rate_limit_per_day)
     yield
     for connection in registry.all():
         connection.dispose()
