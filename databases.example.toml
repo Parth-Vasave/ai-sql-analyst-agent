@@ -1,0 +1,22 @@
+# Databases the analyst can query. Copy to databases.toml and set DATABASES_CONFIG=databases.toml.
+# Connection URLs are secrets: each entry names an environment variable (url_env) that holds
+# the URL; URLs in this file are refused. Every account must be read-only, or it is rejected.
+#
+# sampling: how much data the profiler may read and send to the LLM
+#   off  - structure only
+#   safe - numeric/date ranges + distinct values of short categorical columns (default)
+#   full - safe + a few truncated example values of other text columns
+# Columns that look sensitive (email, password, phone, token, ...) are never sampled.
+
+[[databases]]
+id = "owid"
+name = "OWID CO2 emissions (demo)"
+url_env = "DATABASE_URL"
+schemas = ["public"]
+sampling = "safe"
+
+# [[databases]]
+# id = "shop"
+# name = "My shop database"
+# url_env = "SHOP_DATABASE_URL"
+# sampling = "off"

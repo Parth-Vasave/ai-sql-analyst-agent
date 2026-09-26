@@ -2,18 +2,90 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.api.schemas import HealthResponse
+from app.api.schemas import AddDatabaseRequest, DatabaseInfo, HealthResponse
 from app.config import Settings, get_settings
-from app.database.connection import check_database
+from app.database.connections import (
+    ConnectionConfig,
+    ConnectionRegistry,
+    ConnectionStatus,
+    DatabaseConnection,
+    DatabaseNotReadyError,
+    UnsupportedDatabaseError,
+)
+from app.database.profile import DatabaseProfile
 
 router = APIRouter(prefix="/api")
 
 
+def get_registry(request: Request) -> ConnectionRegistry:
+    return request.app.state.registry
+
+
+Registry = Annotated[ConnectionRegistry, Depends(get_registry)]
+
+
+def _get_connection(registry: ConnectionRegistry, database_id: str) -> DatabaseConnection:
+    try:
+        return registry.get(database_id)
+    except KeyError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Unknown database {database_id!r}") from None
+
+
 @router.get("/health", response_model=HealthResponse)
-def health(response: Response, settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
-    if check_database(settings):
-        return HealthResponse(status="ok", database="ok")
-    response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return HealthResponse(status="degraded", database="unavailable")
+def health(response: Response, registry: Registry) -> HealthResponse:
+    statuses = {}
+    for connection in registry.all():
+        statuses[connection.config.id] = (
+            connection.verify() if connection.status is not ConnectionStatus.READY else connection.status
+        )
+    healthy = bool(statuses) and all(s is ConnectionStatus.READY for s in statuses.values())
+    if not healthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return HealthResponse(status="ok" if healthy else "degraded", databases=statuses)
+
+
+@router.get("/databases", response_model=list[DatabaseInfo])
+def list_databases(registry: Registry) -> list[DatabaseInfo]:
+    return [DatabaseInfo.from_connection(c) for c in registry.all()]
+
+
+@router.get("/databases/{database_id}/profile", response_model=DatabaseProfile)
+def database_profile(database_id: str, registry: Registry, refresh: bool = False) -> DatabaseProfile:
+    connection = _get_connection(registry, database_id)
+    try:
+        return connection.profile(refresh=refresh)
+    except DatabaseNotReadyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+
+
+@router.post("/databases", response_model=DatabaseInfo, status_code=status.HTTP_201_CREATED)
+def add_database(
+    body: AddDatabaseRequest, registry: Registry, settings: Annotated[Settings, Depends(get_settings)]
+) -> DatabaseInfo:
+    if not settings.allow_ui_connections:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Adding databases from the UI is disabled. Set ALLOW_UI_CONNECTIONS=true (local use only).",
+        )
+    config = ConnectionConfig(
+        id=registry.new_id(body.name),
+        name=body.name,
+        url=body.url,
+        source="ui",
+        sampling=body.sampling,
+        schemas=body.schemas,
+    )
+    try:
+        connection = registry.add(config)
+    except (UnsupportedDatabaseError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+    info = DatabaseInfo.from_connection(connection)
+    if connection.status is not ConnectionStatus.READY:
+        registry.remove(config.id)
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            {"message": f"Database not added: it is {connection.status.value}.", "issues": info.issues},
+        )
+    return info

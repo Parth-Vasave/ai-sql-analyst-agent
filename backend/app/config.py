@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,8 +12,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Connection for the read-only sql_agent role. Never the owner/admin account.
-    database_url: SecretStr
+    # Databases the analyst can query: a TOML file of [[databases]] entries, or a single
+    # DATABASE_URL. Always read-only accounts; accounts that can modify data are refused.
+    databases_config: Path | None = None
+    database_url: SecretStr | None = None
+    # Lets users add databases through the UI/API. Local or self-hosted use only: never
+    # enable on a public deployment (it lets anyone make the server connect anywhere).
+    allow_ui_connections: bool = False
+    profile_time_budget_seconds: float = Field(default=30, gt=0, le=300)
 
     query_timeout_seconds: float = Field(default=5, gt=0, le=60)
     max_retries: int = Field(default=2, ge=0, le=5)
@@ -29,4 +36,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]  # values come from the environment
+    return Settings()

@@ -2,11 +2,11 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 1 — Dataset ingestion + PostgreSQL (complete)
+Milestone 2 — Database-agnostic layer (2a done) → Question → SQL → Result (2b next)
 
 Current Objective
 
-Start Milestone 2: question → SQL → PostgreSQL → result.
+2b: LLM client, SQL generation told the target dialect, executor, POST /api/query. Needs the LLM provider decision + API key.
 
 ⸻
 
@@ -26,13 +26,31 @@ Milestone 1 — Dataset ingestion + PostgreSQL
 * [x] Tests: cleaning rules, seeding, role privileges, timeout, health endpoint
 * [x] Manual analytical queries verified on the full real dataset (database/queries/sanity_checks.sql)
 
-Milestone 2 — Basic Question → SQL → PostgreSQL → Result
+Milestone 2 — Database-agnostic layer + Question → SQL → Result
 
+Goal: the analyst adapts to ANY connected database (not just the OWID demo) and queries it safely.
+
+2a. Database layer and automatic profiling (no LLM)
+* [x] Connection registry: databases from config file (databases.toml, url_env) and, when
+      ALLOW_UI_CONNECTIONS=true (local/self-hosted only), added at runtime through the API
+* [x] SQLAlchemy Core engine layer (NullPool, read-only session, timeout) + adapter interface
+* [x] PostgreSQL adapter: URL normalization, read-only/timeout session options, privilege check
+* [x] Privilege check on connect: refuse connections whose account can modify data
+* [x] Profiler: tables, columns, types, comments, PK/FK, row estimates, inferred joins,
+      sensitive-column detection, value hints by sampling mode, schema fingerprint + cache
+* [x] API: GET /api/databases, GET /api/databases/{id}/profile, POST /api/databases (local mode)
+* [x] Tests on two differently shaped schemas
+
+2b. Question → SQL → Result
 * [ ] LLM client abstraction (OpenAI-compatible; scripted fake client for tests)
-* [ ] Schema metadata from information_schema + column comments
-* [ ] SQL generator with structured JSON output
-* [ ] Executor (sql_agent connection, timeout, read-only transaction)
-* [ ] POST /api/query (minimal)
+* [ ] SQL generator with structured JSON output, told the target SQL dialect
+* [ ] Executor (read-only connection, timeout) + POST /api/query with database_id
+
+Later in this track
+* [ ] MySQL adapter (+ CI against MySQL)
+* [ ] Profile override file (descriptions, hidden tables, business rules)
+* [ ] LLM-drafted column descriptions (marked as generated, editable)
+* [ ] Generated example questions, kept only if their SQL executes
 
 Milestone 3 — SQL safety validation
 
@@ -92,6 +110,16 @@ Important Decisions
 * Deployment target: Vercel (frontend + FastAPI serverless function) with a managed Postgres (e.g. Neon).
   Short-lived DB connections chosen with serverless in mind.
 * Test fixture is an unmodified real extract of the OWID file; malformed cases are built in memory.
+* Database-agnostic design: the agent works on any connected database. OWID is the built-in demo and the
+  evaluation benchmark; arbitrary databases get automatic profiling but no verified ground truth.
+* Databases are added via configuration and, only when ALLOW_UI_CONNECTIONS=true (local/self-hosted),
+  via the UI. Never enabled on the public deployment (SSRF / credential-handling risk).
+* Engines: PostgreSQL now, MySQL next. SQLAlchemy Core + a small per-engine adapter for what differs
+  (timeouts, read-only enforcement, privilege checks, error mapping); sqlglot with the right dialect.
+* Accounts we did not create are checked on connect; accounts that can modify data are refused.
+* Value sampling is configurable per database: off | safe (default: numeric/date ranges and short
+  categorical values, never free text or sensitive-looking columns) | full (adds short text examples).
+  Sampled values are sent to the LLM provider; this is documented.
 
 ⸻
 

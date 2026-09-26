@@ -2,9 +2,43 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, SecretStr
+
+from app.database.connections import ConnectionStatus, DatabaseConnection
+from app.database.profile import SamplingMode
 
 
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
-    database: Literal["ok", "unavailable"]
+    databases: dict[str, ConnectionStatus]
+
+
+class DatabaseInfo(BaseModel):
+    """Public view of a connection. Never includes the URL or credentials."""
+
+    id: str
+    name: str
+    dialect: str
+    source: Literal["config", "ui"]
+    sampling: SamplingMode
+    status: ConnectionStatus
+    issues: list[str]
+
+    @classmethod
+    def from_connection(cls, connection: DatabaseConnection) -> DatabaseInfo:
+        return cls(
+            id=connection.config.id,
+            name=connection.config.name,
+            dialect=connection.adapter.backend,
+            source=connection.config.source,
+            sampling=connection.config.sampling,
+            status=connection.status,
+            issues=connection.issues,
+        )
+
+
+class AddDatabaseRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    url: SecretStr
+    sampling: SamplingMode = SamplingMode.SAFE
+    schemas: list[str] | None = None
