@@ -195,6 +195,12 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       per-run passwords (same setup as the session-start hook). Any skipped test fails the job, so
       the integration tests cannot silently drop out. The offline SQL safety suite is not in CI: it
       needs the full pinned OWID data (row-count check), which is not committed
+* [x] Type checking: mypy (strict defs: every function annotated) over backend/app, scripts and
+      evaluation, in the CI lint job. It found 15 errors, fixed: annotations naming sqlglot's
+      `Expression` where the base class is now `Expr`; a trace status typed as plain str; a
+      profiler path that could reflect schema None; a type narrowing lost behind a boolean.
+      No behaviour change (all suites pass). Tests are not type-checked (24 errors, mostly
+      loosely typed fixtures); a possible follow-up
 * [ ] README
 * [x] Request rate limiting on POST /api/query (app/api/rate_limit.py), checked before the agent
       runs: RATE_LIMIT_PER_MINUTE per client address (default 10) and RATE_LIMIT_PER_DAY across
@@ -320,4 +326,4 @@ dependencies, starts the local PostgreSQL cluster (down after every container re
 emissions_test database and owner role with fresh random passwords, and exports both variables. The
 full OWID demo database is not loaded by the hook; seed it by hand when a live check needs it.
 Run tests: `python -m pytest scripts/tests`, `cd backend && python -m pytest` and
-`python -m pytest evaluation/tests`; lint: `ruff check . && ruff format --check .`. CI runs the same.
+`python -m pytest evaluation/tests`; lint: `ruff check . && ruff format --check . && mypy`. CI runs the same.

@@ -50,9 +50,12 @@ from app.observability import current_request_id, log_event
 logger = logging.getLogger("app.agent")
 
 
+TraceStatus = Literal["success", "failed", "skipped"]
+
+
 class TraceEvent(BaseModel):
     step: str
-    status: Literal["success", "failed", "skipped"]
+    status: TraceStatus
     duration_ms: int
     detail: dict[str, Any] = {}
 
@@ -99,7 +102,7 @@ class _Trace:
     def __init__(self) -> None:
         self.events: list[TraceEvent] = []
 
-    def record(self, step: str, status: str = "success", duration_ms: int = 0, **detail: Any) -> None:
+    def record(self, step: str, status: TraceStatus = "success", duration_ms: int = 0, **detail: Any) -> None:
         self.events.append(TraceEvent(step=step, status=status, duration_ms=duration_ms, detail=detail))
         level = logging.WARNING if status == "failed" else logging.INFO
         log_event(logger, "agent step", level, step=step, status=status, duration_ms=duration_ms, **detail)
@@ -181,7 +184,7 @@ class AgentController:
                 trace.record(
                     "chart_selection", duration_ms=ms[0], type=outcome.chart.type, reason=outcome.chart.reason
                 )
-            status = "failed" if outcome.status == "error" else "success"
+            status: TraceStatus = "failed" if outcome.status == "error" else "success"
             trace.record("completed", status, retries=meta.retry_count, **detail)
             outcome.trace = trace.events
             return outcome
@@ -350,7 +353,7 @@ class AgentController:
                 outcome.answer, outcome.answer_source = fallback, "template"
                 return
             ungrounded = ungrounded_numbers(generated.answer, outcome.question, outcome.rows, outcome.plan)
-            detail = {
+            detail: dict[str, Any] = {
                 "model": call.model,
                 "prompt_version": ANSWER_PROMPT_VERSION,
                 "prompt_tokens": call.prompt_tokens,
