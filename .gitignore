@@ -20,7 +20,6 @@ venv/
 
 # Node
 node_modules/
-*.tsbuildinfo
 dist/
 .vercel/
 
@@ -28,9 +27,3 @@ dist/
 .idea/
 .vscode/
 .DS_Store
-
-# Impeccable design tooling: local review captures and build state (PRODUCT.md, DESIGN.md and
-# .impeccable/surfaces/ are durable project context and are committed)
-.impeccable/review/
-.impeccable/build/
-.impeccable/mocks/

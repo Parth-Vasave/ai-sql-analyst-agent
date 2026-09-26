@@ -1,7 +1,7 @@
 #!/bin/bash
 # SessionStart hook for Claude Code on the web: makes the test suites and linter runnable.
 #
-# 1. Installs the Python dependencies of the backend and the data pipeline, and the frontend's npm packages.
+# 1. Installs the Python dependencies of the backend and the data pipeline.
 # 2. Starts the local PostgreSQL cluster (it is down after every container restart).
 # 3. Creates a disposable test database and an owner role for the integration tests, with
 #    fresh random passwords each session (no credentials are stored in the repository), and
@@ -19,10 +19,6 @@ cd "${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
 python3 -m pip install --quiet --disable-pip-version-check --root-user-action=ignore \
   -r backend/requirements-dev.txt -r scripts/requirements.txt
-
-if [ -f frontend/package.json ]; then
-  (cd frontend && npm install --no-audit --no-fund --silent)
-fi
 
 setup_test_database() {
   command -v pg_lsclusters >/dev/null || { echo "PostgreSQL is not installed"; return 1; }
