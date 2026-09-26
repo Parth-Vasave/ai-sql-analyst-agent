@@ -1,0 +1,57 @@
+# Local stack. Copy .env.example to .env and fill in the passwords first.
+#   docker compose up -d                      # postgres (schema + sql_agent role) and backend
+#   docker compose run --rm seed              # load data/processed/daily_prices_clean.csv
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mandi_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-mandi}
+      SQL_AGENT_PASSWORD: ${SQL_AGENT_PASSWORD:?Set SQL_AGENT_PASSWORD in .env}
+      QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-5}
+      SQL_DIR: /db
+    volumes:
+      - ./database:/db:ro
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      # The API only ever connects as the read-only sql_agent role.
+      DATABASE_URL: postgresql://sql_agent:${SQL_AGENT_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandi}
+      QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-5}
+      MAX_RETRIES: ${MAX_RETRIES:-2}
+      MAX_ROWS: ${MAX_ROWS:-1000}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  seed:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    environment:
+      ADMIN_DATABASE_URL: postgresql://${POSTGRES_USER:-mandi_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandi}
+    volumes:
+      - ./data:/work/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

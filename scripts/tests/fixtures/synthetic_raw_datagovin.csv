@@ -1,0 +1,18 @@
+State,District,Market,Commodity,Variety,Grade,Arrival_Date,Min_x0020_Price,Max_x0020_Price,Modal_x0020_Price
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,15/01/2023,2000,2400,2200
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,15/01/2024,2300,2700,2500
+Test State A,District A1,Market A2,Wheat,Lokwan,FAQ,16/01/2024,2400,2800,2600
+Test State B,District B1,Market B1,Wheat,Dara,FAQ,15/01/2023,1900,2300,2100
+Test State B,District B1,Market B1,Wheat,Dara,FAQ,15/01/2024,2000,2400,2250
+Test State B,District B1,Market B1,Onion,Red,FAQ,15/01/2024,1000,1600,1300
+  Test State B ,  District   B1 , Market B1 ,Onion,Red,FAQ,16/01/2024,"1,100","1,700","1,400"
+Test State B,District B1,Market B1,Onion,,,17/01/2024,1200,1800,1500
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,31/02/2024,2300,2700,2500
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,20/01/2024,NR,2700,2500
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,21/01/2024,0,2700,2500
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,22/01/2024,2900,2700,2800
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,23/01/2024,2300,2700,3000
+Test State A,District A1,Market A1,Wheat,Dara,FAQ,15/01/2023,2000,2400,2200
+Test State A,District A1,Market A2,Wheat,Lokwan,FAQ,17/01/2024,2400,2800,2600
+Test State A,District A1,Market A2,Wheat,Lokwan,FAQ,17/01/2024,2450,2850,2650
+Test State A,District A1,,Wheat,Dara,FAQ,24/01/2024,2300,2700,2500

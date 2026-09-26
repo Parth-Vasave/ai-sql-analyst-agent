@@ -2,146 +2,102 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Phase 0 — Project Initialization
+Milestone 1 — Dataset ingestion + PostgreSQL (code complete; blocked on real data)
 
 Current Objective
 
-Set up the project foundation and determine the implementation architecture.
+Load the real AGMARKNET dataset and verify the manual analytical queries on it.
 
 ⸻
 
-Phase 0 — Initialization
+Milestone 1 — Dataset ingestion + PostgreSQL
 
-* Inspect repository
-* Confirm project requirements
-* Decide final technology versions
-* Initialize backend
-* Initialize frontend
-* Create Docker configuration
-* Create .env.example
-* Create initial README
-* Create testing infrastructure
+* [x] Rename claude.md → CLAUDE.md
+* [x] Identify official mandi dataset (data.gov.in / AGMARKNET; see data/README.md)
+* [x] Document dataset source, columns, cleaning rules and assumptions (data/README.md)
+* [x] Ingestion script: data.gov.in API → data/raw + provenance manifest (scripts/ingest_data.py)
+* [x] Cleaning script with per-rule drop counts (scripts/clean_data.py)
+* [x] Normalized PostgreSQL schema + indexes + CHECK constraints (database/schema.sql)
+* [x] Read-only sql_agent role: SELECT only, read-only default, statement_timeout (database/permissions.sql)
+* [x] Seed script: one transaction, idempotent (scripts/seed_database.py)
+* [x] Backend skeleton: FastAPI + settings + GET /api/health
+* [x] docker-compose (postgres, backend, seed) + .env.example + .gitignore
+* [x] Tests: cleaning rules, seeding, role privileges, timeout, health endpoint
+* [x] Manual analytical queries written (database/queries/sanity_checks.sql), verified on synthetic fixture
+* [ ] Download real dataset and record download date
+* [ ] Seed real data and run sanity_checks.sql on it
+* [ ] Decide dataset scope (commodities / states / years) and size of committed sample
 
-Phase 1 — Dataset & Database
+Milestone 2 — Basic Question → SQL → PostgreSQL → Result
 
-* Identify official mandi dataset
-* Document dataset source
-* Create ingestion script
-* Clean dataset
-* Design PostgreSQL schema
-* Create database migrations/setup
-* Seed development database
-* Add indexes
-* Create read-only SQL agent database user
-* Verify manual analytical queries
+* [ ] LLM client abstraction (OpenAI-compatible; scripted fake client for tests)
+* [ ] Schema metadata from information_schema + column comments
+* [ ] SQL generator with structured JSON output
+* [ ] Executor (sql_agent connection, timeout, read-only transaction)
+* [ ] POST /api/query (minimal)
 
-Phase 2 — Basic Text-to-SQL
+Milestone 3 — SQL safety validation
 
-* Implement database schema metadata
-* Implement schema retrieval
-* Implement LLM client abstraction
-* Implement query planner
-* Implement SQL generator
-* Implement basic query execution
-* Add API endpoint
-* Test end-to-end question → SQL → result
+* [ ] AST validation with sqlglot: single SELECT only, allow-listed tables/columns, no system catalogs
+* [ ] Reject INSERT/UPDATE/DELETE/DROP/ALTER/CREATE/TRUNCATE/GRANT/REVOKE, multiple statements
+* [ ] Block dangerous functions (pg_sleep, pg_read_file, dblink, ...)
+* [ ] Security tests
 
-Phase 3 — SQL Security
+Milestone 4 — Read-only user + timeout + LIMIT enforcement
 
-* Implement SQL AST parsing
-* Allow SELECT only
-* Reject destructive statements
-* Reject multiple statements
-* Enforce allowed tables
-* Enforce maximum LIMIT
-* Implement query timeout
-* Add security tests
-* Verify database permissions
+* [x] Read-only role and database-level timeout (done early in Milestone 1)
+* [ ] LIMIT enforcement by AST rewrite (add or clamp to MAX_ROWS)
+* [ ] Timeout surfaced as a trace event with retry for a cheaper query
 
-Phase 4 — Agent Reliability
-
-* Implement SQL error detection
-* Implement automatic query repair
-* Implement retry limit
-* Implement result validation
-* Handle empty results
-* Handle ambiguous questions
-* Handle unsupported questions
-
-Phase 5 — Answer & Visualization
-
-* Implement answer generation
-* Implement chart selection
-* Implement chart data transformation
-* Implement frontend result table
-* Implement SQL viewer
-* Implement chart viewer
-
-Phase 6 — Observability
-
-* Implement structured trace events
-* Track execution time
-* Track retries
-* Track SQL errors
-* Build trace UI
-* Add request IDs
-* Add structured logging
-
-Phase 7 — Evaluation
-
-* Create evaluation dataset
-* Create 50+ questions
-* Categorize questions
-* Verify ground truth
-* Implement result-based evaluation
-* Implement safety evaluation
-* Implement latency metrics
-* Generate evaluation report
-
-Phase 8 — Frontend Polish
-
-* Improve responsive design
-* Add loading states
-* Add error states
-* Add example questions
-* Improve SQL presentation
-* Improve result table
-* Improve trace visualization
-
-Phase 9 — Testing & Deployment
-
-* Backend unit tests
-* API tests
-* Security tests
-* Agent integration tests
-* Frontend tests
-* Docker test
-* Production build
-* Deployment
-* Final README
-* Architecture diagram
-* Screenshots/demo GIF
+Milestone 5 — Query planner
+Milestone 6 — Automatic SQL repair/retry (max 2)
+Milestone 7 — Result validation (deterministic checks)
+Milestone 8 — Natural-language answer generation
+Milestone 9 — Chart generation
+Milestone 10 — Execution trace + structured logging + request IDs
+Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safety suite)
+Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
+  * Use the `frontend-design` plugin (Anthropic directory) and impeccable.style design guidance
+Milestone 13 — Tests, Docker, README, Vercel deployment, polish
 
 ⸻
 
 Completed Work
 
-None.
+* Milestone 1 code, schema, role, scripts and tests. 29 pipeline/database tests + 3 API tests pass.
+* docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
+  seed service loads data, sql_agent write attempts are denied.
 
 ⸻
 
 Current Blockers
 
-None.
+* Real data: the development environment's network policy blocks data.gov.in and agmarknet.gov.in.
+  Options: allow api.data.gov.in in the environment network settings and provide DATA_GOV_IN_API_KEY,
+  or download a CSV manually and add it to data/raw/.
 
 ⸻
 
 Important Decisions
 
-Record significant architectural decisions here.
+* Dataset: data.gov.in "Variety-wise Daily Market Prices" (historical) instead of the "current daily"
+  resource, which only covers the latest day and cannot answer multi-year questions.
+* Security boundary is the database: sql_agent has SELECT on three tables only; read-only default and
+  statement_timeout are set on the role and again per session. The SQL validator is a second layer.
+* Seeding/ingestion use a separate owner account (ADMIN_DATABASE_URL); the API never gets it.
+* psycopg 3 with plain SQL, no ORM: the schema is small and read-only for the app.
+* Schema via idempotent SQL scripts instead of a migration tool (Alembic not needed yet).
+* LLM: free-tier, OpenAI-compatible provider (default Groq, llama-3.3-70b-versatile); swappable via
+  LLM_BASE_URL / LLM_MODEL (Gemini, OpenRouter, local Ollama). To confirm before Milestone 2.
+* Deployment target: Vercel (frontend + FastAPI serverless function) with a managed Postgres (e.g. Neon).
+  Short-lived DB connections chosen with serverless in mind.
+* Synthetic test fixture uses obviously fake place names and is never loaded into the app database.
 
 ⸻
 
 Notes for Next Session
 
-The next Claude session should first read this file and inspect the repository before continuing.
+Read this file and inspect the repository before continuing.
+Local dev DB: see .env.example. Integration tests need TEST_ADMIN_DATABASE_URL and TEST_SQL_AGENT_PASSWORD
+(an empty, disposable database; the tests reset the cluster-wide sql_agent password).
+Run tests: `python -m pytest scripts/tests` and `cd backend && python -m pytest`.
