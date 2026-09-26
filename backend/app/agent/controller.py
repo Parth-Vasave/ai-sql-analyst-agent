@@ -19,6 +19,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from app.agent.answer import (
+    ANSWER_PROMPT_VERSION,
+    AnswerSource,
+    generate_answer,
+    template_answer,
+    ungrounded_numbers,
+)
 from app.agent.executor import QueryExecutionError, QueryResult, execute
 from app.agent.result_checks import ResultCheck, check_result, is_empty, probe_missing_values
 from app.agent.schema_retriever import build_context
@@ -34,6 +41,7 @@ from app.agent.sql_generator import (
 from app.agent.sql_validator import RejectionCode, SQLRejectedError, validate_sql
 from app.database.adapters import ErrorCategory
 from app.database.connections import DatabaseConnection
+from app.database.profile import SamplingMode
 from app.llm.client import LLMClient, LLMError
 
 
@@ -66,6 +74,7 @@ class AgentResult(BaseModel):
     status: Literal["success", "needs_clarification", "unanswerable", "error"]
     question: str
     answer: str | None = None
+    answer_source: AnswerSource | None = None
     clarification_question: str | None = None
     explanation: str | None = None
     plan: QueryPlan | None = None
@@ -117,10 +126,18 @@ REPAIRABLE_ERRORS = frozenset(
 
 
 class AgentController:
-    def __init__(self, llm: LLMClient, max_rows: int, max_retries: int = 2) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        max_rows: int,
+        max_retries: int = 2,
+        answer_llm: LLMClient | None = None,
+    ) -> None:
+        """answer_llm writes natural-language answers; without it, answers come from a template."""
         self.llm = llm
         self.max_rows = max_rows
         self.max_retries = max_retries
+        self.answer_llm = answer_llm
 
     def run(self, question: str, connection: DatabaseConnection) -> AgentResult:
         trace = _Trace()
@@ -147,6 +164,8 @@ class AgentController:
                 outcome = best
                 detail = {"reason": "a repair attempt did not improve on an earlier result; returning it"}
                 outcome.metadata.retry_count = meta.retry_count
+            if outcome.status == "success":
+                self._answer(outcome, connection, trace)
             status = "failed" if outcome.status == "error" else "success"
             trace.record("completed", status, retries=meta.retry_count, **detail)
             outcome.trace = trace.events
@@ -292,6 +311,54 @@ class AgentController:
                 continue
             return finish(best)
         raise AssertionError("unreachable: the last attempt always returns")
+
+    def _answer(self, outcome: AgentResult, connection: DatabaseConnection, trace: _Trace) -> None:
+        """Set outcome.answer: from the LLM when allowed and grounded, otherwise from the template."""
+        fallback = template_answer(outcome.columns, outcome.rows, outcome.checks)
+        if self.answer_llm is None:
+            reason = "answers from the LLM are disabled"
+        elif connection.config.sampling is SamplingMode.OFF:
+            reason = "this database does not allow data to be sent to the LLM (sampling off)"
+        else:
+            try:
+                with trace.timed() as ms:
+                    generated, call = generate_answer(
+                        self.answer_llm,
+                        outcome.question,
+                        outcome.columns,
+                        outcome.rows,
+                        outcome.plan,
+                        outcome.checks,
+                    )
+            except LLMError as exc:
+                trace.record("answer_generation", "failed", ms[0], error=str(exc), fallback="template")
+                outcome.answer, outcome.answer_source = fallback, "template"
+                return
+            ungrounded = ungrounded_numbers(generated.answer, outcome.question, outcome.rows, outcome.plan)
+            detail = {
+                "model": call.model,
+                "prompt_version": ANSWER_PROMPT_VERSION,
+                "prompt_tokens": call.prompt_tokens,
+                "completion_tokens": call.completion_tokens,
+                "provider_attempts": call.attempts,
+            }
+            if not ungrounded:
+                trace.record("answer_generation", duration_ms=ms[0], source="llm", **detail)
+                outcome.answer, outcome.answer_source = generated.answer, "llm"
+                return
+            # A number the rows do not contain is a hallucination risk: never show it.
+            trace.record(
+                "answer_generation",
+                "failed",
+                ms[0],
+                source="template",
+                ungrounded_numbers=ungrounded[:10],
+                **detail,
+            )
+            outcome.answer, outcome.answer_source = fallback, "template"
+            return
+        trace.record("answer_generation", "skipped", 0, source="template", reason=reason)
+        outcome.answer, outcome.answer_source = fallback, "template"
 
     def _failed(
         self,

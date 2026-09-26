@@ -38,7 +38,12 @@ def get_agent(request: Request, settings: Annotated[Settings, Depends(get_settin
     llm = request.app.state.llm
     if llm is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No LLM configured: set LLM_API_KEY.")
-    return AgentController(llm, max_rows=settings.max_rows, max_retries=settings.max_retries)
+    return AgentController(
+        llm,
+        max_rows=settings.max_rows,
+        max_retries=settings.max_retries,
+        answer_llm=llm if settings.answer_mode == "llm" else None,
+    )
 
 
 @router.post("/query", response_model=AgentResult)

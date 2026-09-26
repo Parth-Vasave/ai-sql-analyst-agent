@@ -2,14 +2,15 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 8 — Natural-language answer generation (Milestones 3–7 done)
+Milestone 9 — Chart generation (Milestones 3–8 done)
 
 Current Objective
 
-Milestone 8: turn the executed result into a short natural-language answer grounded in the returned
-rows, using the plan's assumptions and the result checks (empty result, NULL-only columns, row limit)
-so the answer states what the data does and does not show. Numbers in the answer must come from the
-rows. Before a public deployment still add request rate limiting (Milestone 13).
+Milestone 9: choose a chart deterministically from the result's shape (time column -> line, one
+category + one measure -> bar, two measures -> scatter; none for single values or wide tables),
+using the model's chart_suggestion only as a tie-breaker, and return a chart spec (type, x, y,
+series) the frontend can render with Recharts. Before a public deployment still add request rate
+limiting (Milestone 13).
 
 ⸻
 
@@ -123,6 +124,17 @@ Milestone 7 — Result validation (deterministic checks)
 * [x] result_validation trace step; tests: check rules, probes on PostgreSQL (joins, aliases, IN
       lists, CTEs, subqueries, cap), repair of a misspelled value and a NULL-led ranking, fallback
 Milestone 8 — Natural-language answer generation
+
+* [x] Answer step (backend/app/agent/answer.py, prompt answer/1): 1–3 sentences from the question,
+      plan assumptions, result checks and up to 30 rows (long values truncated)
+* [x] Deterministic grounding check: every number in the answer must come from the rows (rounding,
+      thousands separators and 0–1 fractions as percentages allowed), the question or the row count;
+      sums, ratios, unit conversions and wrong figures are rejected
+* [x] Template answer (always grounded) when the check fails, the LLM call fails, ANSWER_MODE=template,
+      or the database's sampling mode is `off` (rows never leave for such databases)
+* [x] answer_source ("llm" | "template") in the response; answer_generation trace step with the
+      reason for any fallback and the ungrounded numbers
+* [ ] Follow-up: give the answer step column units (from column comments) so answers can say "Mt"
 Milestone 9 — Chart generation
 Milestone 10 — Execution trace + structured logging + request IDs
 Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safety suite)
@@ -164,6 +176,10 @@ Completed Work
   hedged country names itself (ISO codes, ILIKE, 'Czech Republic'/'Czechia'), so no check fired and
   the new step passed cleanly. Directly: the probe flagged 'Ivory Coast' on the full data, and the real
   repair step turned it into ILIKE '%Ivoire%', returning Cote d'Ivoire's 2020 CO2 (11.019 Mt).
+* Milestone 8 (2026-09-26): 235 backend + 35 pipeline tests pass. Live: gemini-3.6-flash answered
+  "top 5 emitters in 2023" in grounded prose (all five figures from the rows, but without units); on
+  gemini-3.8-flash a 429 on the answer call fell back to the template answer while the request still
+  succeeded. The other 4 of 6 live requests failed with 429 (free-tier quota) at SQL generation.
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 

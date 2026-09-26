@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,6 +25,9 @@ class Settings(BaseSettings):
     query_timeout_seconds: float = Field(default=5, gt=0, le=60)
     max_retries: int = Field(default=2, ge=0, le=5)
     max_rows: int = Field(default=1000, ge=1, le=10_000)
+    # "llm": natural-language answers written by the LLM (one extra call per question) and checked
+    # against the rows; "template": answers built from the rows without the LLM.
+    answer_mode: Literal["llm", "template"] = "llm"
 
     # Any OpenAI-compatible chat-completions endpoint (Groq, Gemini, OpenRouter, Ollama, ...).
     llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"

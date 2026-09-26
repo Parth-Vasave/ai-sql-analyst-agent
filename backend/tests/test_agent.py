@@ -105,7 +105,7 @@ def test_question_to_sql_to_result(shop) -> None:
     assert result.chart_suggestion == "bar"
     assert [e.step for e in result.trace] == [
         "question_received", "schema_retrieval", "sql_generation", "sql_validation", "query_execution",
-        "result_validation", "completed",
+        "result_validation", "answer_generation", "completed",
     ]  # fmt: skip
     system, user = llm.calls[0]
     assert "postgres SQL" in system and "LIMIT 100" in system
@@ -239,7 +239,7 @@ def test_validation_rejection_is_repaired(shop) -> None:
         ("question_received", "success"), ("schema_retrieval", "success"),
         ("sql_generation", "success"), ("sql_validation", "failed"),
         ("sql_repair", "success"), ("sql_validation", "success"), ("query_execution", "success"),
-        ("result_validation", "success"), ("completed", "success"),
+        ("result_validation", "success"), ("answer_generation", "skipped"), ("completed", "success"),
     ]  # fmt: skip
     repair_prompt = llm.calls[1][1]
     assert "SELECT states, count(*)" in repair_prompt  # the failed SQL
@@ -377,3 +377,70 @@ def test_result_checks_are_returned_when_retries_run_out(shop) -> None:
     result = AgentController(llm, max_rows=100, max_retries=0).run("How many shipped?", shop)
     assert result.status == "success" and len(llm.calls) == 1
     assert "missing_value" in [c.code for c in result.checks]
+
+
+# --- answers (Milestone 8) ----------------------------------------------------------------
+
+STATUS_SQL = "SELECT status, count(*) AS orders FROM shop.orders GROUP BY status ORDER BY status LIMIT 10"
+
+
+def answering(text: str) -> ScriptedLLMClient:
+    return ScriptedLLMClient(lambda s, u: json.dumps({"answer": text}), model="answer-model")
+
+
+def test_template_answer_without_an_answer_model(shop) -> None:
+    result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100).run("Orders per status?", shop)
+    assert result.answer_source == "template"
+    assert result.answer == "3 rows. First: status placed, orders 20."
+    assert next(e for e in result.trace if e.step == "answer_generation").status == "skipped"
+
+
+def test_grounded_llm_answer_is_used(shop) -> None:
+    answer_llm = answering("Each status (placed, returned, shipped) has 20 orders.")
+    result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=answer_llm).run(
+        "Orders per status?", shop
+    )
+    assert result.answer_source == "llm"
+    assert result.answer == "Each status (placed, returned, shipped) has 20 orders."
+    system, user = answer_llm.calls[0]
+    assert "Every number you write must appear in the rows" in system
+    assert '["placed", 20]' in user and "Question: Orders per status?" in user
+    step = next(e for e in result.trace if e.step == "answer_generation")
+    assert (step.status, step.detail["source"], step.detail["model"]) == ("success", "llm", "answer-model")
+
+
+def test_answer_with_an_invented_number_falls_back_to_the_template(shop) -> None:
+    answer_llm = answering("There are 60 orders in total, 20 per status.")  # 60 is computed, not in the rows
+    result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=answer_llm).run(
+        "Orders per status?", shop
+    )
+    assert result.answer_source == "template" and "60" not in result.answer
+    step = next(e for e in result.trace if e.step == "answer_generation")
+    assert step.status == "failed" and step.detail["ungrounded_numbers"] == ["60"]
+
+
+def test_answer_model_failure_falls_back_to_the_template(shop) -> None:
+    broken = ScriptedLLMClient(lambda s, u: "not json")
+    result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=broken).run("?", shop)
+    assert result.status == "success" and result.answer_source == "template"
+
+
+def test_rows_are_not_sent_to_the_llm_when_sampling_is_off(pg) -> None:
+    registry = ConnectionRegistry(timeout_seconds=2)
+    private = registry.add(
+        ConnectionConfig(id="p", name="P", url=SecretStr(pg.agent), schemas=["shop"], sampling="off")
+    )
+    answer_llm = answering("unused")
+    result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=answer_llm).run(
+        "?", private
+    )
+    assert answer_llm.calls == [] and result.answer_source == "template"
+    step = next(e for e in result.trace if e.step == "answer_generation")
+    assert "sampling off" in step.detail["reason"]
+
+
+def test_no_answer_step_for_errors(shop) -> None:
+    answer_llm = answering("unused")
+    llm = sequence(reply("DELETE FROM shop.orders"))
+    result = AgentController(llm, max_rows=100, answer_llm=answer_llm).run("?", shop)
+    assert result.status == "error" and result.answer is None and answer_llm.calls == []
