@@ -1,10 +1,13 @@
-"""Orchestrates one question: schema retrieval -> plan + SQL generation -> validation -> execution.
+"""Orchestrates one question: schema retrieval -> plan + SQL generation -> validation ->
+execution -> result checks.
 
-A repairable failure (validator rejection or database error) is fed back to the model for a
-corrected query, at most max_retries times; every repaired query is validated again.
+A repairable failure (validator rejection, database error, or a result check such as a
+misspelled filter value) is fed back to the model for a corrected query, at most max_retries
+times; every repaired query is validated again. If a repair ends worse than an earlier
+executed result, that earlier result is returned.
 
 Each step appends a structured TraceEvent (what happened, how long it took, key outputs),
-never the model's reasoning. Later milestones add validation, repair, answer and chart steps.
+never the model's reasoning. Later milestones add answer and chart steps.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from app.agent.executor import QueryExecutionError, QueryResult, execute
+from app.agent.result_checks import ResultCheck, check_result, is_empty, probe_missing_values
 from app.agent.schema_retriever import build_context
 from app.agent.sql_generator import (
     PROMPT_VERSION,
@@ -69,8 +73,9 @@ class AgentResult(BaseModel):
     columns: list[str] = []
     rows: list[list[Any]] = []
     chart_suggestion: str | None = None
+    checks: list[ResultCheck] = []  # deterministic result checks (Milestone 7)
     error: QueryError | None = None
-    trace: list[TraceEvent]
+    trace: list[TraceEvent] = []
     metadata: QueryMetadata
 
 
@@ -133,6 +138,20 @@ class AgentController:
         meta.tables_used = context.table_names
         trace.record("schema_retrieval", duration_ms=ms[0], tables=context.table_names)
 
+        # The most recent executed result. A repair that ends worse (an error, or no SQL at all)
+        # must not throw away a result that ran: it is returned instead, with its checks.
+        best: AgentResult | None = None
+
+        def finish(outcome: AgentResult, **detail: Any) -> AgentResult:
+            if outcome.status != "success" and best is not None:
+                outcome = best
+                detail = {"reason": "a repair attempt did not improve on an earlier result; returning it"}
+                outcome.metadata.retry_count = meta.retry_count
+            status = "failed" if outcome.status == "error" else "success"
+            trace.record("completed", status, retries=meta.retry_count, **detail)
+            outcome.trace = trace.events
+            return outcome
+
         failed: FailedAttempt | None = None
         for attempt in range(1, self.max_retries + 2):
             meta.retry_count = attempt - 1
@@ -149,7 +168,7 @@ class AgentController:
                         )
             except LLMError as exc:
                 trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc))
-                return self._error(question, trace, meta, "llm_error", str(exc))
+                return finish(self._error(question, meta, "llm_error", str(exc)))
             trace.record(
                 step,
                 duration_ms=ms[0],
@@ -164,30 +183,28 @@ class AgentController:
             plan = generated.plan
 
             if generated.clarification_question is not None:
-                trace.record("completed", reason="question is ambiguous; clarification requested")
-                return AgentResult(
+                outcome = AgentResult(
                     status="needs_clarification",
                     question=question,
                     clarification_question=generated.clarification_question,
                     explanation=generated.explanation,
                     plan=plan,
-                    trace=trace.events,
                     metadata=meta,
                 )
+                return finish(outcome, reason="question is ambiguous; clarification requested")
             if generated.sql is None:
-                trace.record("completed", reason="question cannot be answered from this database")
-                return AgentResult(
+                outcome = AgentResult(
                     status="unanswerable",
                     question=question,
                     answer=generated.explanation,
                     explanation=generated.explanation,
                     plan=plan,
-                    trace=trace.events,
                     metadata=meta,
                 )
+                return finish(outcome, reason="question cannot be answered from this database")
             if failed is not None and _same_sql(generated.sql, failed.sql):
                 trace.record(step, "failed", 0, attempt=attempt, error="repair returned the same SQL")
-                return self._failed(question, trace, meta, failed)
+                return finish(self._failed(question, meta, failed))
 
             # Never trust generated SQL: only a validated, rewritten query reaches the database.
             try:
@@ -199,7 +216,7 @@ class AgentController:
                 )
                 failed = FailedAttempt(generated.sql, "validation", exc.code, exc.message, plan)
                 if exc.code not in REPAIRABLE_REJECTIONS or attempt > self.max_retries:
-                    return self._failed(question, trace, meta, failed, generated.explanation)
+                    return finish(self._failed(question, meta, failed, generated.explanation))
                 continue
             meta.tables_used = validated.tables
             trace.record(
@@ -227,7 +244,7 @@ class AgentController:
                 )
                 failed = FailedAttempt(validated.sql, "execution", exc.category, exc.message, plan)
                 if exc.category not in REPAIRABLE_ERRORS or attempt > self.max_retries:
-                    return self._failed(question, trace, meta, failed, generated.explanation)
+                    return finish(self._failed(question, meta, failed, generated.explanation))
                 continue
 
             meta.execution_time_ms, meta.row_count, meta.truncated = (
@@ -242,8 +259,22 @@ class AgentController:
                 rows=result.row_count,
                 truncated=result.truncated,
             )
-            trace.record("completed", retries=meta.retry_count)
-            return AgentResult(
+
+            with trace.timed() as ms:
+                checks = check_result(
+                    result, validated.sql, meta.dialect, validated.limit, validated.limit_action
+                )
+                if is_empty(result):
+                    checks += probe_missing_values(connection, profile, validated.sql, meta.dialect)
+            repairable = [c for c in checks if c.repairable]
+            trace.record(
+                "result_validation",
+                "failed" if repairable else "success",
+                ms[0],
+                attempt=attempt,
+                checks=[c.code for c in checks],
+            )
+            best = AgentResult(
                 status="success",
                 question=question,
                 explanation=generated.explanation,
@@ -252,41 +283,38 @@ class AgentController:
                 columns=result.columns,
                 rows=result.rows,
                 chart_suggestion=generated.chart_suggestion,
-                trace=trace.events,
-                metadata=meta,
+                checks=checks,
+                metadata=meta.model_copy(deep=True),
             )
+            if repairable and attempt <= self.max_retries:
+                message = " ".join(c.message for c in repairable)
+                failed = FailedAttempt(validated.sql, "result", repairable[0].code, message, plan)
+                continue
+            return finish(best)
         raise AssertionError("unreachable: the last attempt always returns")
 
     def _failed(
         self,
         question: str,
-        trace: _Trace,
         meta: QueryMetadata,
         failed: FailedAttempt,
         explanation: str | None = None,
     ) -> AgentResult:
         if failed.stage == "validation":
-            result = self._error(question, trace, meta, "validation", failed.message, code=failed.reason)
+            result = self._error(question, meta, "validation", failed.message, code=failed.reason)
         else:
-            result = self._error(question, trace, meta, failed.reason, failed.message)
+            result = self._error(question, meta, failed.reason, failed.message)
         result.sql, result.explanation, result.plan = failed.sql, explanation, failed.plan
         return result
 
     @staticmethod
     def _error(
-        question: str,
-        trace: _Trace,
-        meta: QueryMetadata,
-        category: str,
-        message: str,
-        code: str | None = None,
+        question: str, meta: QueryMetadata, category: str, message: str, code: str | None = None
     ) -> AgentResult:
-        trace.record("completed", "failed", retries=meta.retry_count)
         return AgentResult(
             status="error",
             question=question,
             error=QueryError(category=str(category), message=message, code=code),
-            trace=trace.events,
             metadata=meta,
         )
 

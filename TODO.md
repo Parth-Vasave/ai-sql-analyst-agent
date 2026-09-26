@@ -2,14 +2,14 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 7 — Result validation (Milestones 3–6 done)
+Milestone 8 — Natural-language answer generation (Milestones 3–7 done)
 
 Current Objective
 
-Milestone 7: deterministic checks on query results (empty results, NULL-only columns, suspicious
-magnitudes, truncation) that feed the answer step and, where useful, the repair loop. Both safety
-layers (read-only account + SQL validator) are in place; before a public deployment still add request
-rate limiting (Milestone 13).
+Milestone 8: turn the executed result into a short natural-language answer grounded in the returned
+rows, using the plan's assumptions and the result checks (empty result, NULL-only columns, row limit)
+so the answer states what the data does and does not show. Numbers in the answer must come from the
+rows. Before a public deployment still add request rate limiting (Milestone 13).
 
 ⸻
 
@@ -109,6 +109,19 @@ Milestone 6 — Automatic SQL repair/retry (max 2)
 * [x] Tests: repair after rejection / database error / division by zero / timeout, bounded retries,
       repeated SQL, unsafe SQL not retried, repair ending in clarification, retries disabled
 Milestone 7 — Result validation (deterministic checks)
+
+* [x] Checks on every executed result (backend/app/agent/result_checks.py): empty result, aggregate
+      over nothing (one row of NULLs/zeros, e.g. COUNT = 0), ranking led by a NULL, NULL-only column,
+      row limit reached (when the LIMIT was added or clamped), duplicate rows
+* [x] Missing-value probes for empty results: each `column = 'text'` / `IN (...)` filter on a real
+      table column (WHERE and JOIN conditions, CTEs and subqueries included) gets a one-row existence
+      query, built from the syntax tree, validated and run read-only; max 3 per result. Only the
+      model's own literal is echoed back, never database values
+* [x] Repairable checks (missing value, NULL-led ranking) go through the Milestone 6 repair loop with
+      targeted hints; the others are returned as `checks` for the answer step and the user
+* [x] If a repair ends worse than an executed result (error, no SQL), that result is returned
+* [x] result_validation trace step; tests: check rules, probes on PostgreSQL (joins, aliases, IN
+      lists, CTEs, subqueries, cap), repair of a misspelled value and a NULL-led ranking, fallback
 Milestone 8 — Natural-language answer generation
 Milestone 9 — Chart generation
 Milestone 10 — Execution trace + structured logging + request IDs
@@ -147,6 +160,10 @@ Completed Work
   real repair step was exercised directly with two constructed failures: division by zero was
   repaired with NULLIF, an unknown column with real emissions columns; both repairs validated and
   returned correct rows.
+* Milestone 7 (2026-09-26): 209 backend + 35 pipeline tests pass. Live (gemini-3.6-flash): the model
+  hedged country names itself (ISO codes, ILIKE, 'Czech Republic'/'Czechia'), so no check fired and
+  the new step passed cleanly. Directly: the probe flagged 'Ivory Coast' on the full data, and the real
+  repair step turned it into ILIKE '%Ivoire%', returning Cote d'Ivoire's 2020 CO2 (11.019 Mt).
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 

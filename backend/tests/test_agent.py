@@ -105,7 +105,7 @@ def test_question_to_sql_to_result(shop) -> None:
     assert result.chart_suggestion == "bar"
     assert [e.step for e in result.trace] == [
         "question_received", "schema_retrieval", "sql_generation", "sql_validation", "query_execution",
-        "completed",
+        "result_validation", "completed",
     ]  # fmt: skip
     system, user = llm.calls[0]
     assert "postgres SQL" in system and "LIMIT 100" in system
@@ -239,7 +239,7 @@ def test_validation_rejection_is_repaired(shop) -> None:
         ("question_received", "success"), ("schema_retrieval", "success"),
         ("sql_generation", "success"), ("sql_validation", "failed"),
         ("sql_repair", "success"), ("sql_validation", "success"), ("query_execution", "success"),
-        ("completed", "success"),
+        ("result_validation", "success"), ("completed", "success"),
     ]  # fmt: skip
     repair_prompt = llm.calls[1][1]
     assert "SELECT states, count(*)" in repair_prompt  # the failed SQL
@@ -321,3 +321,59 @@ def test_no_repair_when_retries_are_disabled(shop) -> None:
     )
     result = AgentController(llm, max_rows=100, max_retries=0).run("?", shop)
     assert result.status == "error" and len(llm.calls) == 1
+
+
+# --- result checks feeding the repair loop (Milestone 7) ---------------------------------
+
+
+def test_empty_result_with_a_misspelled_value_is_repaired(shop) -> None:
+    llm = sequence(
+        reply("SELECT count(*) AS n FROM shop.orders WHERE status = 'Shipped'"),
+        reply("SELECT count(*) AS n FROM shop.orders WHERE status = 'shipped'"),
+    )
+    result = AgentController(llm, max_rows=100).run("How many orders shipped?", shop)
+    assert result.status == "success" and result.rows == [[20]] and result.metadata.retry_count == 1
+    assert ("result_validation", "failed") in steps(result)
+    repair_prompt = llm.calls[1][1]
+    assert "No row in shop.orders has status = 'Shipped'" in repair_prompt
+    assert "result failed a check (missing_value)" in repair_prompt
+
+
+def test_empty_result_with_existing_values_is_accepted_without_repair(shop) -> None:
+    llm = sequence(reply("SELECT id FROM shop.orders WHERE status = 'returned' AND total > 100000 LIMIT 5"))
+    result = AgentController(llm, max_rows=100).run("Returned orders over 100k?", shop)
+    assert result.status == "success" and result.rows == [] and len(llm.calls) == 1
+    assert [c.code for c in result.checks] == ["empty_result"]
+
+
+def test_ranking_led_by_nulls_is_repaired(shop) -> None:
+    llm = sequence(
+        reply(
+            "SELECT id, CASE WHEN id > 50 THEN NULL ELSE total END AS amount FROM shop.orders "
+            "ORDER BY amount DESC LIMIT 3"
+        ),
+        reply("SELECT id, total AS amount FROM shop.orders WHERE id <= 50 ORDER BY amount DESC LIMIT 3"),
+    )
+    result = AgentController(llm, max_rows=100).run("Top 3 orders among the first 50?", shop)
+    assert result.status == "success" and result.rows[0] == [50, 500]
+    assert "null_first_in_ranking" in llm.calls[1][1] and "NULLS LAST" in llm.calls[1][1]
+
+
+def test_earlier_result_is_kept_when_a_repair_ends_worse(shop) -> None:
+    llm = sequence(
+        reply("SELECT count(*) AS n FROM shop.orders WHERE status = 'Shipped'"),
+        reply("DELETE FROM shop.orders"),  # not repairable: would end the loop with an error
+    )
+    result = AgentController(llm, max_rows=100).run("How many orders shipped?", shop)
+    assert result.status == "success" and result.rows == [[0]]
+    assert [c.code for c in result.checks] == ["empty_aggregate", "missing_value"]
+    assert result.sql == "SELECT COUNT(*) AS n FROM shop.orders WHERE status = 'Shipped' LIMIT 100"
+    assert result.metadata.retry_count == 1
+    assert "did not improve" in result.trace[-1].detail["reason"]
+
+
+def test_result_checks_are_returned_when_retries_run_out(shop) -> None:
+    llm = sequence(reply("SELECT count(*) AS n FROM shop.orders WHERE status = 'Shipped'"))
+    result = AgentController(llm, max_rows=100, max_retries=0).run("How many shipped?", shop)
+    assert result.status == "success" and len(llm.calls) == 1
+    assert "missing_value" in [c.code for c in result.checks]

@@ -196,13 +196,17 @@ def _check_tables(tree: exp.Expression, profile: DatabaseProfile) -> list[str]:
     return used
 
 
-def _check_columns(tree: exp.Expression, profile: DatabaseProfile, dialect: str) -> None:
-    """Resolve every column against the profile. Sensitive columns are left out, so they are unknown."""
+def profile_schema(profile: DatabaseProfile, dialect: str) -> MappingSchema:
+    """The profile as a sqlglot schema. Sensitive columns are left out, so they are unknown."""
     mapping: dict[str, dict[str, dict[str, str]]] = {}
     for table in profile.tables:
         columns = {c.name: "unknown" for c in table.columns if not c.sensitive}
         mapping.setdefault(table.schema_name, {})[table.name] = columns
+    return MappingSchema(mapping, dialect=dialect)
 
+
+def _check_columns(tree: exp.Expression, profile: DatabaseProfile, dialect: str) -> None:
+    """Resolve every column against the profile (sensitive columns are unknown to it)."""
     for star in tree.find_all(exp.Star):
         if not isinstance(star.parent, exp.Count):
             raise _reject(RejectionCode.STAR, "SELECT * is not allowed; name the columns.")
@@ -210,7 +214,7 @@ def _check_columns(tree: exp.Expression, profile: DatabaseProfile, dialect: str)
     try:
         qualified = qualify(
             tree.copy(),
-            schema=MappingSchema(mapping, dialect=dialect),
+            schema=profile_schema(profile, dialect),
             dialect=dialect,
             validate_qualify_columns=True,
             quote_identifiers=False,

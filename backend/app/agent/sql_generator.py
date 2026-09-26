@@ -108,6 +108,11 @@ _REPAIR_HINTS = {
     "undefined_table": "Use only tables listed in the schema.",
     "star": "Name the columns you need instead of using *.",
     "whole_row": "Select individual columns, not a whole table row.",
+    "missing_value": (
+        "A text value in your filters does not exist in the data. Use the value exactly as stored "
+        "(see the listed values and column comments), or match it case-insensitively."
+    ),
+    "null_first_in_ranking": "The ranking starts with NULL values: exclude NULLs or use NULLS LAST.",
 }
 
 
@@ -116,14 +121,18 @@ class FailedAttempt:
     """What went wrong with the previous SQL, as fed back to the model for repair."""
 
     sql: str
-    stage: Literal["validation", "execution"]
+    stage: Literal["validation", "execution", "result"]
     reason: str  # validator rejection code or database error category
     message: str
     plan: QueryPlan | None = None
 
 
 def build_repair_prompt(question: str, context: SchemaContext, failed: FailedAttempt) -> str:
-    stage = "was rejected by the SQL safety validator" if failed.stage == "validation" else "failed"
+    stage = {
+        "validation": "was rejected by the SQL safety validator",
+        "execution": "failed",
+        "result": "ran, but its result failed a check",
+    }[failed.stage]
     parts = [
         build_user_prompt(question, context),
         "",
