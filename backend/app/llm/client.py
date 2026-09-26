@@ -11,6 +11,7 @@ with a short wait, so a free-tier hiccup does not fail the whole question.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,7 +20,11 @@ from typing import Protocol, TypeVar
 import httpx
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from app.observability import log_event
+
 T = TypeVar("T", bound=BaseModel)
+
+logger = logging.getLogger("app.llm")
 
 # Rate limited, or the provider is overloaded / briefly unavailable.
 TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
@@ -101,6 +106,15 @@ class OpenAICompatibleClient:
                 break  # e.g. a per-minute quota: waiting that long inside a request is worse than failing
             self._sleep(wait)
         duration_ms = int((time.perf_counter() - started) * 1000)
+        log_event(
+            logger,
+            "llm call",
+            logging.INFO if response.status_code == 200 else logging.WARNING,
+            model=self.model,
+            http_status=response.status_code,
+            attempts=attempt,
+            duration_ms=duration_ms,
+        )
         if response.status_code != 200:
             # The body can echo request details; report the status only.
             tries = f" after {attempt} attempts" if attempt > 1 else ""

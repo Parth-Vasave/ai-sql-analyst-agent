@@ -2,15 +2,16 @@ AI SQL Analyst — Development Progress
 
 Current Phase
 
-Milestone 10 — Execution trace + structured logging + request IDs (Milestones 3–9 done)
+Milestone 11 — Evaluation framework (Milestones 3–10 done)
 
 Current Objective
 
-Milestone 10: a request ID on every request (accepted from X-Request-ID or generated, returned in the
-response header and body), structured JSON logs per request and per agent step (step, status,
-duration, attempt, error category) that never contain secrets, connection URLs or result rows, and
-the trace linked to the request ID. Before a public deployment still add request rate limiting
-(Milestone 13).
+Milestone 11: rewrite EVALUATION_PLAN.md for the yearly OWID data, build the 50+ question set with
+verified ground truth (hand-written SQL run on the pinned dataset), a runner that scores by result
+(not SQL text) and reports the plan's metrics, and the safety suite. Needs an LLM budget: each
+question can take up to 4 calls (SQL, 2 repairs, answer; ANSWER_MODE=template saves one) and the free
+Gemini tier (5/min, ~20/day per model) cannot run it in one go. Never report numbers that were not
+produced by a real run. Before a public deployment still add request rate limiting (Milestone 13).
 
 ⸻
 
@@ -148,6 +149,18 @@ Milestone 9 — Chart generation
 * [x] Tests: column kinds, every form rule, limits, tie-breaks; checked on the 10 real LLM queries
       plus a multi-series trend and a GDP-vs-CO2 scatter on the full OWID data
 Milestone 10 — Execution trace + structured logging + request IDs
+
+* [x] Request IDs (backend/app/observability.py): X-Request-ID kept when it is a safe token
+      ([A-Za-z0-9._-], max 64), otherwise generated; returned in the header (exposed via CORS) and in
+      metadata.request_id of query results
+* [x] JSON log lines (ts, level, logger, message, request_id, fields) for every request, every agent
+      trace step (failures at WARNING) and every LLM call (model, HTTP status, attempts, duration)
+* [x] Never logged: question text, SQL, result rows, answers, URLs, passwords, keys (safe_fields);
+      LLM request/response bodies are never logged
+* [x] Unexpected errors: generic 500 with the request ID; the stack trace goes to the log only
+* [x] Tests: ID generation/propagation/validation, CORS exposure, 500 handling, JSON format, field
+      filtering, and an end-to-end query whose logs share one request ID and contain none of the
+      question, SQL, result values, database password or URL
 Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safety suite)
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
   * Use the `frontend-design` plugin (Anthropic directory) and impeccable.style design guidance
@@ -195,6 +208,9 @@ Completed Work
   real results from the full data gave horizontal bars for rankings, stat tiles for single values, a
   line for India's CO2 trend (growth columns left to the table: different scale), three lines for a
   3-country trend and a scatter for GDP vs CO2.
+* Milestone 10 (2026-09-26): 279 backend + 35 pipeline tests pass. Live server: one JSON line per
+  request with the caller's X-Request-ID kept; a real query that hit a Gemini 429 logged the LLM call
+  (http_status 429, attempts 3), the failed step and the request, all under the same request ID.
 * docker compose stack verified: postgres init creates schema + role, backend /api/health returns ok,
   seed service downloads, cleans and loads the data, sql_agent write attempts are denied.
 

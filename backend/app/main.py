@@ -11,6 +11,8 @@ from app.api.routes import router
 from app.config import get_settings
 from app.database.connections import build_registry
 from app.llm.client import OpenAICompatibleClient
+from app.observability import REQUEST_ID_HEADER, configure_logging
+from app.observability import install as install_observability
 
 
 @asynccontextmanager
@@ -36,12 +38,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings.log_level)
     app = FastAPI(title="AI SQL Analyst", version="0.1.0", lifespan=lifespan)
+    install_observability(app)  # request IDs + request logs; added before CORS so CORS wraps it
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type", "X-Request-ID"],
+        allow_headers=["Content-Type", REQUEST_ID_HEADER],
+        expose_headers=[REQUEST_ID_HEADER],
     )
     app.include_router(router)
     return app

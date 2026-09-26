@@ -12,6 +12,7 @@ never the model's reasoning.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -44,6 +45,9 @@ from app.database.adapters import ErrorCategory
 from app.database.connections import DatabaseConnection
 from app.database.profile import SamplingMode
 from app.llm.client import LLMClient, LLMError
+from app.observability import current_request_id, log_event
+
+logger = logging.getLogger("app.agent")
 
 
 class TraceEvent(BaseModel):
@@ -69,6 +73,7 @@ class QueryMetadata(BaseModel):
     row_count: int | None = None
     truncated: bool = False
     retry_count: int = 0
+    request_id: str | None = None  # matches the X-Request-ID header and the log lines
 
 
 class AgentResult(BaseModel):
@@ -96,6 +101,8 @@ class _Trace:
 
     def record(self, step: str, status: str = "success", duration_ms: int = 0, **detail: Any) -> None:
         self.events.append(TraceEvent(step=step, status=status, duration_ms=duration_ms, detail=detail))
+        level = logging.WARNING if status == "failed" else logging.INFO
+        log_event(logger, "agent step", level, step=step, status=status, duration_ms=duration_ms, **detail)
 
     @contextmanager
     def timed(self) -> Iterator[list[int]]:
@@ -149,6 +156,7 @@ class AgentController:
             dialect=connection.adapter.sqlglot_dialect,
             model=self.llm.model,
             prompt_version=PROMPT_VERSION,
+            request_id=current_request_id(),
         )
 
         with trace.timed() as ms:
