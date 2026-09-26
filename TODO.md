@@ -271,4 +271,8 @@ Notes for Next Session
 Read this file and inspect the repository before continuing.
 Local dev DB: see .env.example. Rebuild data: ingest_data → clean_data → seed_database (or `docker compose run --rm seed`). Integration tests need TEST_ADMIN_DATABASE_URL and TEST_SQL_AGENT_PASSWORD
 (an empty, disposable database; the tests reset the cluster-wide sql_agent password).
+In Claude Code on the web, .claude/hooks/session-start.sh does this automatically: installs the Python
+dependencies, starts the local PostgreSQL cluster (down after every container restart), creates the
+emissions_test database and owner role with fresh random passwords, and exports both variables. The
+full OWID demo database is not loaded by the hook; seed it by hand when a live check needs it.
 Run tests: `python -m pytest scripts/tests` and `cd backend && python -m pytest`.
