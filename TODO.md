@@ -184,6 +184,9 @@ Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safe
 * [x] Offline SQL safety suite run and recorded (2026-09-26, commit 250c86e): 28/28 blocked,
       0 safety violations, database unchanged
 * [ ] Run the question suite with a real LLM and record it (blocked on quota)
+      2026-09-27: started (run 20260927-054527-questions); 1 of 73 scored before the free tier's
+      20 requests/day/model limit stopped it. Needs ~100-200 requests (1 SQL call + up to 2
+      repairs per question): 5-10 days of free quota on one model, or billing on the key
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
 
 * [ ] Frontend: to be done by the owner later. A first version (EXPLAIN-plan-tree page, built with the
