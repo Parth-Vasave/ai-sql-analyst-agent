@@ -20,7 +20,8 @@ What is in the repository
 * evaluation/safety_sql.py    28 adversarial SQL statements for the offline safety suite
 * evaluation/run.py           resumable runner, one JSON record per question in evaluation/results/
 * evaluation/report.py        metrics from a results file
-* evaluation/tests/           tests of scoring, runner and report (no LLM, no database)
+* evaluation/tests/           tests of scoring, runner and report (no LLM), and the replay tests
+                              (test_replay.py, below; need the disposable test database)
 
 ⸻
 
@@ -99,6 +100,16 @@ from the ground truth's.
     python -m evaluation.run --suite questions --run-id <id>     # resume after quota or crash
     python -m evaluation.report evaluation/results/<id>.jsonl
 
+Replay tests (CI, every push)
+
+evaluation/tests/test_replay.py runs the pipeline end to end with scripted LLM replies instead of a
+model, against the pipeline's OWID fixture subset: every query question's ground-truth SQL through
+the runner, agent, scoring and report; a wrong answer that must score wrong; the three repair paths
+(validator rejection, database error, result check); the retry budget; clarification, unanswerable,
+blocked writes and a leaked secret; and the offline SQL safety suite. They prove the machinery works
+and that every ground-truth query passes the validator. They say nothing about a model's accuracy:
+never report their numbers as evaluation results.
+
 LLM budget: each question takes one call for the SQL plus up to two repairs, plus one for the
 answer with --answers llm (the default, template, needs none). On the free Gemini tier (about 5
 requests per minute and 20 per day per model) the question suite has to be run in daily batches
@@ -109,6 +120,17 @@ with the same --run-id; the runner stops by itself after three provider failures
 Evaluation History
 
 Record every run here with its report. Never add numbers that were not produced by a run.
+
+2026-09-27 — question suite, PARTIAL (run 20260927-054527-questions) — not a result
+Commit: b7b98f5 | Dataset: OWID 382ee6c | Model: gemini-3.5-flash | answers: template
+Results: evaluation/results/20260927-054527-questions.jsonl
+* 1 of 73 questions scored (Q001, correct); Q002-Q004 not run: HTTP 429, then the runner stopped
+  itself after three provider failures in a row. 69 never reached
+* Cause: the key's Gemini free tier allows 20 requests per day per model
+  (GenerateRequestsPerDayPerProjectPerModel-FreeTier), already used up that day
+* One question says nothing about accuracy: no metric from this run may be quoted. Resume with
+  `python -m evaluation.run --suite questions --run-id 20260927-054527-questions` once quota allows
+  (same model and commit, or start a new run)
 
 2026-09-26 — offline SQL safety suite (run 20260926-135036-sql-safety)
 Commit: 250c86e | Dataset: OWID 382ee6c | Model: none (scripted adversarial SQL, no LLM calls)

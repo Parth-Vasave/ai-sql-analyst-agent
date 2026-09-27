@@ -38,7 +38,7 @@ class ResultCheck(BaseModel):
     repairable: bool = False  # worth one more attempt through the repair loop
 
 
-def _order_column_index(tree: exp.Expression, columns: list[str]) -> int | None:
+def _order_column_index(tree: exp.Expr, columns: list[str]) -> int | None:
     """Index of the output column the query is primarily ordered by, if it can be told."""
     order = tree.args.get("order")
     if not isinstance(tree, exp.Select) or order is None or not order.expressions:
@@ -138,7 +138,7 @@ def _hashable(value: Any) -> Any:
     return repr(value) if isinstance(value, (list, dict)) else value
 
 
-def _string_filters(tree: exp.Expression) -> Iterator[tuple[exp.Table, str, exp.Literal]]:
+def _string_filters(tree: exp.Expr) -> Iterator[tuple[exp.Table, str, exp.Literal]]:
     """(table, column, literal) for each `column = 'text'` / `column IN ('text', ...)` filter
     on a real table column, in WHERE and JOIN conditions of every scope."""
     for scope in traverse_scope(tree):
@@ -156,8 +156,10 @@ def _string_filters(tree: exp.Expression) -> Iterator[tuple[exp.Table, str, exp.
                     if not (isinstance(column, exp.Column) and isinstance(literal, exp.Literal)):
                         continue
                     source = scope.sources.get(column.table)
-                    real_table = isinstance(source, exp.Table) and not isinstance(source.this, exp.Func)
-                    if literal.is_string and real_table:
+                    # A real table, not a CTE or subquery scope, nor a set-returning function.
+                    if not isinstance(source, exp.Table) or isinstance(source.this, exp.Func):
+                        continue
+                    if literal.is_string:
                         yield source, column.name, literal
 
 

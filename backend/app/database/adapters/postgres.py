@@ -78,11 +78,11 @@ class PostgresAdapter(DatabaseAdapter):
         if role.rolcreatedb:
             report.warnings.append("account can create databases")
 
-        writable = conn.execute(_WRITABLE_TABLES).scalars().all()
+        writable: list[str] = list(conn.execute(_WRITABLE_TABLES).scalars())
         if writable:
             report.blocking.append("account can modify tables: " + ", ".join(writable))
 
-        schemas = conn.execute(_CREATABLE_SCHEMAS).scalars().all()
+        schemas: list[str] = list(conn.execute(_CREATABLE_SCHEMAS).scalars())
         if schemas:
             report.warnings.append("account can create objects in schema(s): " + ", ".join(schemas))
         if conn.execute(text("SELECT has_database_privilege(current_database(), 'TEMP')")).scalar():

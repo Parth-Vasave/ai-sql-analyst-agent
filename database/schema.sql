@@ -125,13 +125,13 @@ CREATE TABLE IF NOT EXISTS ghg_emissions (
 COMMENT ON TABLE ghg_emissions IS 'Yearly greenhouse gas emissions (methane, nitrous oxide, total GHG) and contribution to global warming per entity.';
 COMMENT ON COLUMN ghg_emissions.year IS 'Calendar year.';
 COMMENT ON COLUMN ghg_emissions.methane IS 'Annual methane (CH4) emissions, million tonnes of CO2-equivalents (MtCO2e).';
-COMMENT ON COLUMN ghg_emissions.methane_per_capita IS 'Annual methane emissions per person, tonnes of CO2-equivalents per person.';
+COMMENT ON COLUMN ghg_emissions.methane_per_capita IS 'Annual methane emissions per person, tonnes of CO2-equivalents per person (tCO2e/person).';
 COMMENT ON COLUMN ghg_emissions.nitrous_oxide IS 'Annual nitrous oxide (N2O) emissions, million tonnes of CO2-equivalents (MtCO2e).';
-COMMENT ON COLUMN ghg_emissions.nitrous_oxide_per_capita IS 'Annual nitrous oxide emissions per person, tonnes of CO2-equivalents per person.';
+COMMENT ON COLUMN ghg_emissions.nitrous_oxide_per_capita IS 'Annual nitrous oxide emissions per person, tonnes of CO2-equivalents per person (tCO2e/person).';
 COMMENT ON COLUMN ghg_emissions.total_ghg IS 'Total greenhouse gas emissions including land-use change and forestry, million tonnes of CO2-equivalents (MtCO2e). Can be negative.';
 COMMENT ON COLUMN ghg_emissions.total_ghg_excluding_lucf IS 'Total greenhouse gas emissions excluding land-use change and forestry, million tonnes of CO2-equivalents (MtCO2e).';
-COMMENT ON COLUMN ghg_emissions.ghg_per_capita IS 'Total greenhouse gas emissions including land use per person, tonnes of CO2-equivalents per person.';
-COMMENT ON COLUMN ghg_emissions.ghg_excluding_lucf_per_capita IS 'Total greenhouse gas emissions excluding land use per person, tonnes of CO2-equivalents per person.';
+COMMENT ON COLUMN ghg_emissions.ghg_per_capita IS 'Total greenhouse gas emissions including land use per person, tonnes of CO2-equivalents per person (tCO2e/person).';
+COMMENT ON COLUMN ghg_emissions.ghg_excluding_lucf_per_capita IS 'Total greenhouse gas emissions excluding land use per person, tonnes of CO2-equivalents per person (tCO2e/person).';
 COMMENT ON COLUMN ghg_emissions.temperature_change_from_ghg IS 'Contribution to global mean surface temperature change from all greenhouse gases, degrees Celsius (°C).';
 COMMENT ON COLUMN ghg_emissions.temperature_change_from_co2 IS 'Contribution to global temperature change from CO2, degrees Celsius (°C).';
 COMMENT ON COLUMN ghg_emissions.temperature_change_from_ch4 IS 'Contribution to global temperature change from methane, degrees Celsius (°C).';

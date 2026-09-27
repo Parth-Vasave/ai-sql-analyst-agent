@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 import sqlglot
 from sqlglot import exp
@@ -29,7 +29,7 @@ _SYSTEM_SCHEMAS = {"pg_catalog", "information_schema", "pg_toast", "mysql", "per
 
 # Node types that write, change schema or session state, or lock rows -- rejected anywhere in
 # the tree, including inside CTEs (PostgreSQL allows `WITH x AS (DELETE ... RETURNING *)`).
-_FORBIDDEN_NODES: tuple[type[exp.Expression], ...] = (
+_FORBIDDEN_NODES: tuple[type[exp.Expr], ...] = (
     exp.DML,  # INSERT, UPDATE, DELETE, MERGE
     exp.Create,
     exp.Drop,
@@ -107,7 +107,7 @@ def _parse(sql: str, dialect: str) -> exp.Query:
     return tree
 
 
-def _check_forbidden_nodes(tree: exp.Expression) -> None:
+def _check_forbidden_nodes(tree: exp.Expr) -> None:
     for node in tree.walk():
         if isinstance(node, _FORBIDDEN_NODES):
             raise _reject(
@@ -119,7 +119,7 @@ def _function_name(node: exp.Func) -> str:
     return (node.name if isinstance(node, exp.Anonymous) else node.sql_name()).lower()
 
 
-def _check_functions(tree: exp.Expression) -> None:
+def _check_functions(tree: exp.Expr) -> None:
     for node in tree.find_all(exp.Func):
         name = _function_name(node)
         if name.startswith(_DENIED_PREFIXES) or (
@@ -128,7 +128,7 @@ def _check_functions(tree: exp.Expression) -> None:
             raise _reject(RejectionCode.FORBIDDEN_FUNCTION, f"Function {name}() is not allowed.")
 
 
-def _identifier(node: exp.Expression | None) -> str | None:
+def _identifier(node: exp.Expr | None) -> str | None:
     """Name as the database sees it: unquoted identifiers fold to lower case."""
     if not isinstance(node, exp.Identifier):
         return None
@@ -168,7 +168,7 @@ class _Tables:
         return candidates[0]
 
 
-def _check_tables(tree: exp.Expression, profile: DatabaseProfile) -> list[str]:
+def _check_tables(tree: exp.Expr, profile: DatabaseProfile) -> list[str]:
     """Every table reference must be a CTE in scope, a set-returning function, or a profile table."""
     tables = _Tables(profile)
     accounted: set[int] = set()
@@ -198,14 +198,14 @@ def _check_tables(tree: exp.Expression, profile: DatabaseProfile) -> list[str]:
 
 def profile_schema(profile: DatabaseProfile, dialect: str) -> MappingSchema:
     """The profile as a sqlglot schema. Sensitive columns are left out, so they are unknown."""
-    mapping: dict[str, dict[str, dict[str, str]]] = {}
+    mapping: dict[str, Any] = {}  # schema -> table -> column -> type
     for table in profile.tables:
         columns = {c.name: "unknown" for c in table.columns if not c.sensitive}
         mapping.setdefault(table.schema_name, {})[table.name] = columns
     return MappingSchema(mapping, dialect=dialect)
 
 
-def _check_columns(tree: exp.Expression, profile: DatabaseProfile, dialect: str) -> None:
+def _check_columns(tree: exp.Expr, profile: DatabaseProfile, dialect: str) -> None:
     """Resolve every column against the profile (sensitive columns are unknown to it)."""
     for star in tree.find_all(exp.Star):
         if not isinstance(star.parent, exp.Count):

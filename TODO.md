@@ -134,7 +134,12 @@ Milestone 8 — Natural-language answer generation
       or the database's sampling mode is `off` (rows never leave for such databases)
 * [x] answer_source ("llm" | "template") in the response; answer_generation trace step with the
       reason for any fallback and the ungrounded numbers
-* [ ] Follow-up: give the answer step column units (from column comments) so answers can say "Mt"
+* [x] Answer units (backend/app/agent/units.py): each result column's unit is the last
+      parenthesised abbreviation in its source column's comment ("(Mt)", "(t/person)", "(%)"),
+      traced with sqlglot through aliases, CTEs and subqueries and kept only through
+      unit-preserving functions (ROUND, SUM, AVG, MIN, MAX, ABS, CAST, windows); ratios, COUNT,
+      CASE and UNIONs get none. Returned as `column_units`, written by the template answer and given
+      to the answer LLM (prompt answer/2). The four GHG per-capita comments gained "(tCO2e/person)"
 Milestone 9 — Chart generation
 
 * [x] Deterministic chart choice (backend/app/agent/chart.py) from column kinds (temporal, measure,
@@ -179,6 +184,9 @@ Milestone 11 — Evaluation framework (50+ questions, result-based scoring, safe
 * [x] Offline SQL safety suite run and recorded (2026-09-26, commit 250c86e): 28/28 blocked,
       0 safety violations, database unchanged
 * [ ] Run the question suite with a real LLM and record it (blocked on quota)
+      2026-09-27: started (run 20260927-054527-questions); 1 of 73 scored before the free tier's
+      20 requests/day/model limit stopped it. Needs ~100-200 requests (1 SQL call + up to 2
+      repairs per question): 5-10 days of free quota on one model, or billing on the key
 Milestone 12 — React frontend (Vite + TS + Tailwind + Recharts)
 
 * [ ] Frontend: to be done by the owner later. A first version (EXPLAIN-plan-tree page, built with the
@@ -195,6 +203,19 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       per-run passwords (same setup as the session-start hook). Any skipped test fails the job, so
       the integration tests cannot silently drop out. The offline SQL safety suite is not in CI: it
       needs the full pinned OWID data (row-count check), which is not committed
+* [x] Type checking: mypy (strict defs: every function annotated) over backend/app, scripts and
+      evaluation, in the CI lint job. It found 15 errors, fixed: annotations naming sqlglot's
+      `Expression` where the base class is now `Expr`; a trace status typed as plain str; a
+      profiler path that could reflect schema None; a type narrowing lost behind a boolean.
+      No behaviour change (all suites pass). Tests are not type-checked (24 errors, mostly
+      loosely typed fixtures); a possible follow-up
+* [x] Replay tests in CI (evaluation/tests/test_replay.py): the evaluation pipeline end to end with
+      scripted LLM replies, on the fixture data. All 55 query questions' ground-truth SQL pass the
+      validator and score correct through runner, agent, scoring and report; a wrong answer scores
+      wrong; repair via validator rejection, database error and result check; retry budget and the
+      same-SQL early stop; clarify / unanswerable / blocked writes / leaked secret; the 28-statement
+      offline safety suite (now in CI). Checked by breaking the scorer and the repair loop: the
+      tests fail. Not an accuracy measurement: never report these numbers as evaluation results
 * [ ] README
 * [x] Request rate limiting on POST /api/query (app/api/rate_limit.py), checked before the agent
       runs: RATE_LIMIT_PER_MINUTE per client address (default 10) and RATE_LIMIT_PER_DAY across
@@ -320,4 +341,4 @@ dependencies, starts the local PostgreSQL cluster (down after every container re
 emissions_test database and owner role with fresh random passwords, and exports both variables. The
 full OWID demo database is not loaded by the hook; seed it by hand when a live check needs it.
 Run tests: `python -m pytest scripts/tests`, `cd backend && python -m pytest` and
-`python -m pytest evaluation/tests`; lint: `ruff check . && ruff format --check .`. CI runs the same.
+`python -m pytest evaluation/tests`; lint: `ruff check . && ruff format --check . && mypy`. CI runs the same.

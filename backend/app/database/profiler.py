@@ -13,6 +13,7 @@ import json
 import re
 import time
 from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import Column, Connection, MetaData, Table, func, inspect, select
 from sqlalchemy import types as sqltypes
@@ -131,7 +132,8 @@ class Profiler:
     def reflect(self, conn: Connection) -> tuple[list[TableProfile], list[Relationship], dict[str, Table]]:
         """Structure only: no table data is read."""
         inspector = inspect(conn)
-        schemas = self.schemas or [inspector.default_schema_name]
+        default_schema = inspector.default_schema_name  # None: the engine has no default schema
+        schemas = self.schemas or ([default_schema] if default_schema else [])
         tables: list[TableProfile] = []
         relationships: list[Relationship] = []
         reflected: dict[str, Table] = {}
@@ -235,12 +237,10 @@ class Profiler:
 
     def _text_hints(self, conn: Connection, table: Table, col: Column, hints: ValueHints) -> None:
         self.adapter.begin_read_only(conn)
-        distinct = (
+        distinct: list[Any] = list(
             conn.execute(
                 select(col).where(col.is_not(None)).group_by(col).order_by(col).limit(MAX_CATEGORIES + 1)
-            )
-            .scalars()
-            .all()
+            ).scalars()
         )
         conn.rollback()
         values = [str(v) for v in distinct]
