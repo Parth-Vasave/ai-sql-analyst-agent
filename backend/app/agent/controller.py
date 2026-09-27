@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, Literal
 
@@ -32,10 +32,12 @@ from app.agent.executor import QueryExecutionError, QueryResult, execute
 from app.agent.result_checks import ResultCheck, check_result, is_empty, probe_missing_values
 from app.agent.schema_retriever import build_context
 from app.agent.sql_generator import (
+    MAX_HISTORY_TURNS,
     PROMPT_VERSION,
     REPAIR_PROMPT_VERSION,
     FailedAttempt,
     QueryPlan,
+    Turn,
     check_plan,
     generate_sql,
     repair_sql,
@@ -83,6 +85,7 @@ class QueryMetadata(BaseModel):
 class AgentResult(BaseModel):
     status: Literal["success", "needs_clarification", "unanswerable", "error"]
     question: str
+    resolved_question: str | None = None  # a follow-up restated in full by the model
     answer: str | None = None
     answer_source: AnswerSource | None = None
     clarification_question: str | None = None
@@ -153,9 +156,11 @@ class AgentController:
         self.max_retries = max_retries
         self.answer_llm = answer_llm
 
-    def run(self, question: str, connection: DatabaseConnection) -> AgentResult:
+    def run(self, question: str, connection: DatabaseConnection, history: Sequence[Turn] = ()) -> AgentResult:
+        """Answer `question`; `history` holds earlier turns of the conversation, oldest first."""
+        history = list(history)[-MAX_HISTORY_TURNS:]
         trace = _Trace()
-        trace.record("question_received", question_length=len(question))
+        trace.record("question_received", question_length=len(question), history_turns=len(history))
         meta = QueryMetadata(
             database_id=connection.config.id,
             dialect=connection.adapter.sqlglot_dialect,
@@ -166,21 +171,27 @@ class AgentController:
 
         with trace.timed() as ms:
             profile = connection.profile()
-            context = build_context(profile, question)
+            # Earlier questions too: "what about China?" alone names no table or metric.
+            context = build_context(profile, " ".join([*(t.question for t in history), question]))
         meta.tables_used = context.table_names
         trace.record("schema_retrieval", duration_ms=ms[0], tables=context.table_names)
 
         # The most recent executed result. A repair that ends worse (an error, or no SQL at all)
         # must not throw away a result that ran: it is returned instead, with its checks.
         best: AgentResult | None = None
+        resolved: str | None = None  # the model's restatement of a follow-up question
 
         def finish(outcome: AgentResult, **detail: Any) -> AgentResult:
             if outcome.status != "success" and best is not None:
                 outcome = best
                 detail = {"reason": "a repair attempt did not improve on an earlier result; returning it"}
                 outcome.metadata.retry_count = meta.retry_count
+            outcome.resolved_question = resolved
             if outcome.status == "success":
-                self._answer(outcome, connection, trace)
+                # Numbers the user wrote in earlier turns may appear in the answer; numbers only in
+                # the model's restatement may not (it is generated text, not the user's).
+                user_text = " ".join([*(t.question for t in history), question])
+                self._answer(outcome, connection, trace, user_text)
                 with trace.timed() as ms:
                     outcome.chart = choose_chart(outcome.columns, outcome.rows, outcome.chart_suggestion)
                 trace.record(
@@ -199,11 +210,11 @@ class AgentController:
                 with trace.timed() as ms:
                     if failed is None:
                         generated, call = generate_sql(
-                            self.llm, question, context, meta.dialect, self.max_rows
+                            self.llm, question, context, meta.dialect, self.max_rows, history
                         )
                     else:
                         generated, call = repair_sql(
-                            self.llm, question, context, meta.dialect, self.max_rows, failed
+                            self.llm, question, context, meta.dialect, self.max_rows, failed, history
                         )
             except LLMError as exc:
                 trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc))
@@ -220,6 +231,8 @@ class AgentController:
                 intent=generated.plan.intent if generated.plan else None,
             )
             plan = generated.plan
+            if history and generated.resolved_question:
+                resolved = generated.resolved_question.strip() or None
 
             if generated.clarification_question is not None:
                 outcome = AgentResult(
@@ -335,8 +348,13 @@ class AgentController:
             return finish(best)
         raise AssertionError("unreachable: the last attempt always returns")
 
-    def _answer(self, outcome: AgentResult, connection: DatabaseConnection, trace: _Trace) -> None:
-        """Set outcome.answer: from the LLM when allowed and grounded, otherwise from the template."""
+    def _answer(
+        self, outcome: AgentResult, connection: DatabaseConnection, trace: _Trace, user_text: str
+    ) -> None:
+        """Set outcome.answer: from the LLM when allowed and grounded, otherwise from the template.
+
+        `user_text` is everything the user wrote (this question and earlier ones): numbers in it
+        count as grounded."""
         fallback = template_answer(outcome.columns, outcome.rows, outcome.checks, outcome.column_units)
         if self.answer_llm is None:
             reason = "answers from the LLM are disabled"
@@ -347,7 +365,7 @@ class AgentController:
                 with trace.timed() as ms:
                     generated, call = generate_answer(
                         self.answer_llm,
-                        outcome.question,
+                        outcome.resolved_question or outcome.question,
                         outcome.columns,
                         outcome.rows,
                         outcome.plan,
@@ -358,7 +376,7 @@ class AgentController:
                 trace.record("answer_generation", "failed", ms[0], error=str(exc), fallback="template")
                 outcome.answer, outcome.answer_source = fallback, "template"
                 return
-            ungrounded = ungrounded_numbers(generated.answer, outcome.question, outcome.rows, outcome.plan)
+            ungrounded = ungrounded_numbers(generated.answer, user_text, outcome.rows, outcome.plan)
             detail: dict[str, Any] = {
                 "model": call.model,
                 "prompt_version": ANSWER_PROMPT_VERSION,

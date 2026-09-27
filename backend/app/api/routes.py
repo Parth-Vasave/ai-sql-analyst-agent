@@ -92,7 +92,7 @@ def query(
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No database is ready.")
         connection = ready[0]
     try:
-        return agent.run(body.question.strip(), connection)
+        return agent.run(body.question.strip(), connection, body.history)
     except DatabaseNotReadyError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
