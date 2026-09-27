@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr
 
+from app.agent.sql_generator import MAX_HISTORY_TURNS, Turn
 from app.database.connections import ConnectionStatus, DatabaseConnection
 from app.database.profile import SamplingMode
 
@@ -40,6 +41,9 @@ class DatabaseInfo(BaseModel):
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     database_id: str | None = None  # defaults to the first ready database
+    # Earlier turns of the conversation, oldest first, for follow-up questions ("what about
+    # China?"). The client keeps the conversation; the server stores nothing between requests.
+    history: list[Turn] = Field(default=[], max_length=MAX_HISTORY_TURNS)
 
 
 class AddDatabaseRequest(BaseModel):

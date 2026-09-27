@@ -19,6 +19,7 @@ import pytest
 
 from app.agent.controller import AgentController, AgentResult
 from app.agent.executor import execute
+from app.agent.sql_generator import Turn
 from app.database.connections import DatabaseConnection
 from app.llm.client import ScriptedLLMClient
 from evaluation.dataset import fingerprint, load_questions
@@ -48,8 +49,9 @@ def replay_ask(connection: DatabaseConnection, replies: dict[str, list[str]]) ->
     def ask(item: dict[str, Any]) -> AgentResult:
         script = replies[item["id"]]
         llm = ScriptedLLMClient(lambda system, user: script[min(len(llm.calls) - 1, len(script) - 1)])
+        history = [Turn(**turn) for turn in item.get("history", [])]  # as evaluation/run.py does
         return AgentController(llm, max_rows=MAX_ROWS, max_retries=MAX_RETRIES).run(
-            item["question"], connection
+            item["question"], connection, history
         )
 
     return ask
@@ -92,7 +94,7 @@ def test_every_ground_truth_query_passes_the_agent_and_scores_correct(
     replies = {i: [reply(QUESTIONS[i]["ground_truth"]["sql"])] for i in QUERY_IDS}
     summary, records = replay(owid, replies, tmp_path / "replay.jsonl")
 
-    assert summary.scored == len(QUERY_IDS) == 55 and summary.integrity_ok
+    assert summary.scored == len(QUERY_IDS) == 60 and summary.integrity_ok
     wrong = {i: (r["status"], r["error"] or r["reason"]) for i, r in records.items() if not r["correct"]}
     assert wrong == {}  # a rejection here means the validator refuses a hand-written ground truth
     # A question about a country the fixture lacks runs, returns nothing, and the missing-value
@@ -102,7 +104,7 @@ def test_every_ground_truth_query_passes_the_agent_and_scores_correct(
     assert sum(r["row_count"] > 0 for r in records.values()) >= MIN_NON_EMPTY
 
     metrics = compute(records, QUERY_IDS, integrity_violations=0)
-    assert metrics["complete"] and metrics["result_correctness"] == "55/55 (100%)"
+    assert metrics["complete"] and metrics["result_correctness"] == "60/60 (100%)"
     assert metrics["safety_violations"] == 0
 
 
@@ -207,3 +209,15 @@ def test_units_reach_the_result_and_the_answer(owid: DatabaseConnection) -> None
     assert result.status == "success"
     assert result.column_units == {"co2": "Mt"}
     assert result.answer == "co2: 2,422.732 Mt."  # template answer (no answer LLM in replays)
+
+
+def test_follow_up_questions_carry_their_earlier_turns(owid: DatabaseConnection) -> None:
+    item = QUESTIONS["Q078"]  # two earlier turns: Germany, then "And France's?"
+    llm = ScriptedLLMClient(lambda s, u: reply(item["ground_truth"]["sql"]))
+    history = [Turn(**turn) for turn in item["history"]]
+    result = AgentController(llm, max_rows=MAX_ROWS).run(item["question"], owid, history)
+    assert result.status == "success"
+    _, user = llm.calls[0]
+    assert "1. Question: What were Germany's CO2 emissions in 2019?" in user
+    assert "2. Question: And France's?" in user
+    assert user.rstrip().endswith("Question: Which of the two was higher?")

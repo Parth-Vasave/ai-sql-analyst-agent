@@ -216,6 +216,12 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       same-SQL early stop; clarify / unanswerable / blocked writes / leaked secret; the 28-statement
       offline safety suite (now in CI). Checked by breaking the scorer and the repair loop: the
       tests fail. Not an accuracy measurement: never report these numbers as evaluation results
+* [x] Follow-up questions: POST /api/query takes `history` (up to 3 earlier turns: question, SQL,
+      answer), sent back by the client; the server keeps no conversation state. Turns reach the
+      SQL prompt (sql-generator/3, sql-repair/2) as context only, and schema retrieval uses them
+      too. The model returns `resolved_question` (the follow-up in full), shown in the response
+      and used for the answer; grounding accepts numbers from any user turn, never from that
+      restatement. New SQL is validated as always. 5 follow-up questions (Q074-Q078) in the suite
 * [ ] README
 * [x] Request rate limiting on POST /api/query (app/api/rate_limit.py), checked before the agent
       runs: RATE_LIMIT_PER_MINUTE per client address (default 10) and RATE_LIMIT_PER_DAY across
@@ -226,8 +232,10 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       uvicorn: the 4th request with a limit of 3 got 429, Retry-After: 60.
       Limitation: in memory, per process. For serverless or multi-instance deployments (Vercel)
       the limits must move to a shared store, to be decided with the deployment
-* [ ] Uvicorn's default access log records client IPs; the app already logs requests without
-      them (observability.py). Consider --no-access-log in backend/Dockerfile
+* [x] backend/Dockerfile: uvicorn runs with --no-access-log (its access log records client IPs;
+      the app logs each request itself without them), a HEALTHCHECK on /api/health (unhealthy
+      while a database is unreachable), and a .dockerignore. Checked by building and running the
+      image: healthy with the database up, unhealthy with it down, no access-log lines
 * [ ] Docker check from a clean start
 * [ ] Deployment (Vercel + Neon), after the frontend
 

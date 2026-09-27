@@ -32,6 +32,7 @@ from typing import Any
 from sqlalchemy.engine import make_url
 
 from app.agent.controller import AgentController, AgentResult
+from app.agent.sql_generator import Turn
 from app.config import get_settings
 from app.database.connections import ConnectionConfig, ConnectionRegistry, DatabaseConnection
 from app.llm.client import LLMClient, OpenAICompatibleClient, ScriptedLLMClient
@@ -274,7 +275,9 @@ def main(argv: list[str] | None = None) -> int:
             max_retries=settings.max_retries,
             answer_llm=llm if args.answers == "llm" else None,
         )
-        ask = lambda item: controller.run(item["question"], connection)  # noqa: E731
+        ask = lambda item: controller.run(  # noqa: E731
+            item["question"], connection, [Turn(**turn) for turn in item.get("history", [])]
+        )
         model, delay = settings.llm_model, 15.0 if args.delay is None else args.delay
 
     if args.ids:
