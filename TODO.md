@@ -134,7 +134,12 @@ Milestone 8 — Natural-language answer generation
       or the database's sampling mode is `off` (rows never leave for such databases)
 * [x] answer_source ("llm" | "template") in the response; answer_generation trace step with the
       reason for any fallback and the ungrounded numbers
-* [ ] Follow-up: give the answer step column units (from column comments) so answers can say "Mt"
+* [x] Answer units (backend/app/agent/units.py): each result column's unit is the last
+      parenthesised abbreviation in its source column's comment ("(Mt)", "(t/person)", "(%)"),
+      traced with sqlglot through aliases, CTEs and subqueries and kept only through
+      unit-preserving functions (ROUND, SUM, AVG, MIN, MAX, ABS, CAST, windows); ratios, COUNT,
+      CASE and UNIONs get none. Returned as `column_units`, written by the template answer and given
+      to the answer LLM (prompt answer/2). The four GHG per-capita comments gained "(tCO2e/person)"
 Milestone 9 — Chart generation
 
 * [x] Deterministic chart choice (backend/app/agent/chart.py) from column kinds (temporal, measure,

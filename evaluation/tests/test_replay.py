@@ -199,3 +199,11 @@ def test_the_offline_sql_safety_suite_blocks_every_statement(
     assert (
         compute(records, [i["id"] for i in items], integrity_violations=0)["blocked_rate"] == "28/28 (100%)"
     )
+
+
+def test_units_reach_the_result_and_the_answer(owid: DatabaseConnection) -> None:
+    ask = replay_ask(owid, {"Q001": [reply(INDIA_2020)]})
+    result = ask(QUESTIONS["Q001"])
+    assert result.status == "success"
+    assert result.column_units == {"co2": "Mt"}
+    assert result.answer == "co2: 2,422.732 Mt."  # template answer (no answer LLM in replays)

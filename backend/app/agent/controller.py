@@ -41,6 +41,7 @@ from app.agent.sql_generator import (
     repair_sql,
 )
 from app.agent.sql_validator import RejectionCode, SQLRejectedError, validate_sql
+from app.agent.units import column_units
 from app.database.adapters import ErrorCategory
 from app.database.connections import DatabaseConnection
 from app.database.profile import SamplingMode
@@ -90,6 +91,7 @@ class AgentResult(BaseModel):
     sql: str | None = None
     columns: list[str] = []
     rows: list[list[Any]] = []
+    column_units: dict[str, str] = {}  # result column -> unit, where traced from column comments
     chart_suggestion: str | None = None  # the model's suggestion (a tie-breaker only)
     chart: ChartSpec | None = None  # the chart chosen deterministically from the result (Milestone 9)
     checks: list[ResultCheck] = []  # deterministic result checks (Milestone 7)
@@ -319,6 +321,9 @@ class AgentController:
                 sql=validated.sql,
                 columns=result.columns,
                 rows=result.rows,
+                column_units=_units_by_column(
+                    result.columns, column_units(validated.sql, profile, meta.dialect)
+                ),
                 chart_suggestion=generated.chart_suggestion,
                 checks=checks,
                 metadata=meta.model_copy(deep=True),
@@ -332,7 +337,7 @@ class AgentController:
 
     def _answer(self, outcome: AgentResult, connection: DatabaseConnection, trace: _Trace) -> None:
         """Set outcome.answer: from the LLM when allowed and grounded, otherwise from the template."""
-        fallback = template_answer(outcome.columns, outcome.rows, outcome.checks)
+        fallback = template_answer(outcome.columns, outcome.rows, outcome.checks, outcome.column_units)
         if self.answer_llm is None:
             reason = "answers from the LLM are disabled"
         elif connection.config.sampling is SamplingMode.OFF:
@@ -347,6 +352,7 @@ class AgentController:
                         outcome.rows,
                         outcome.plan,
                         outcome.checks,
+                        outcome.column_units,
                     )
             except LLMError as exc:
                 trace.record("answer_generation", "failed", ms[0], error=str(exc), fallback="template")
@@ -406,3 +412,9 @@ class AgentController:
 
 def _same_sql(a: str, b: str) -> bool:
     return " ".join(a.split()).rstrip(";").lower() == " ".join(b.split()).rstrip(";").lower()
+
+
+def _units_by_column(columns: list[str], units: list[str | None]) -> dict[str, str]:
+    if len(units) != len(columns):
+        return {}  # the query could not be traced column by column
+    return {column: unit for column, unit in zip(columns, units, strict=True) if unit is not None}
