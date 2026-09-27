@@ -232,8 +232,10 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       uvicorn: the 4th request with a limit of 3 got 429, Retry-After: 60.
       Limitation: in memory, per process. For serverless or multi-instance deployments (Vercel)
       the limits must move to a shared store, to be decided with the deployment
-* [ ] Uvicorn's default access log records client IPs; the app already logs requests without
-      them (observability.py). Consider --no-access-log in backend/Dockerfile
+* [x] backend/Dockerfile: uvicorn runs with --no-access-log (its access log records client IPs;
+      the app logs each request itself without them), a HEALTHCHECK on /api/health (unhealthy
+      while a database is unreachable), and a .dockerignore. Checked by building and running the
+      image: healthy with the database up, unhealthy with it down, no access-log lines
 * [ ] Docker check from a clean start
 * [ ] Deployment (Vercel + Neon), after the frontend
 

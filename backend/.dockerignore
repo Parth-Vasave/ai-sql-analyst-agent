@@ -1,0 +1,8 @@
+# Only requirements.txt and app/ are copied into the image; keep the build context small.
+tests/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env
+.env.*
