@@ -169,16 +169,6 @@ export interface DatabaseProfile {
   notes: string[]
 }
 
-export type LlmKeySource = 'env' | 'ui' | 'none'
-
-/** Never includes the key itself. */
-export interface LlmKeyStatus {
-  configured: boolean
-  source: LlmKeySource
-  model: string
-  base_url: string
-}
-
 /** A transport-level failure: the request never reached the agent, or FastAPI itself rejected it
  *  (rate limit, no database ready, no LLM configured, unknown database). Distinct from
  *  AgentResult.status === 'error', which is a real agent run that ended in a reported failure. */

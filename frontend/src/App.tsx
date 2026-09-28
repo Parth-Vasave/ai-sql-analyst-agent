@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { fetchDatabases, removeDatabase, runQuery } from './api/client'
+import { fetchDatabases, runQuery } from './api/client'
 import { ApiError, type AgentResult, type DatabaseInfo, type Turn } from './api/types'
 import { ConnectDatabaseForm } from './components/ConnectDatabaseForm'
 import { HelpPanel } from './components/HelpPanel'
 import { IntroBlock } from './components/IntroBlock'
-import { LlmKeyForm } from './components/LlmKeyForm'
 import { PromptForm } from './components/PromptForm'
 import { QueryBlock } from './components/QueryBlock'
 import { SchemaBrowser } from './components/SchemaBrowser'
@@ -33,7 +32,7 @@ function toHistory(turns: LocalTurn[]): Turn[] {
     }))
 }
 
-type Panel = 'connect' | 'schema' | 'llm-key' | 'help' | null
+type Panel = 'connect' | 'schema' | 'help' | null
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -41,8 +40,6 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [databasesError, setDatabasesError] = useState<ApiError | null>(null)
   const [panel, setPanel] = useState<Panel>(null)
-  const [removing, setRemoving] = useState(false)
-  const [removeError, setRemoveError] = useState<ApiError | null>(null)
   const [turns, setTurns] = useState<LocalTurn[]>(() =>
     loadSession().map((t) => ({ id: t.id, question: t.question, running: false, result: t.result })),
   )
@@ -93,23 +90,6 @@ export default function App() {
     setPanel(null)
   }
 
-  function handleRemove(id: string) {
-    setRemoving(true)
-    setRemoveError(null)
-    removeDatabase(id)
-      .then(() => {
-        setDatabases((current) => {
-          const remaining = current.filter((d) => d.id !== id)
-          setActiveId((activeCurrent) =>
-            activeCurrent === id ? (remaining.find((d) => d.status === 'ready')?.id ?? remaining[0]?.id ?? null) : activeCurrent,
-          )
-          return remaining
-        })
-      })
-      .catch((error: unknown) => setRemoveError(error instanceof ApiError ? error : new ApiError('Could not remove the database.', 0)))
-      .finally(() => setRemoving(false))
-  }
-
   const active = databases.find((d) => d.id === activeId)
   const anyRunning = turns.some((t) => t.running)
   const disabled = anyRunning || (databases.length > 0 && !active) || active?.status === 'rejected'
@@ -130,21 +110,12 @@ export default function App() {
         onToggleTheme={toggle}
         onConnect={() => setPanel(panel === 'connect' ? null : 'connect')}
         onSchema={() => setPanel(panel === 'schema' ? null : 'schema')}
-        onLlmKey={() => setPanel(panel === 'llm-key' ? null : 'llm-key')}
         onHelp={() => setPanel(panel === 'help' ? null : 'help')}
-        onRemove={handleRemove}
-        removing={removing}
       />
-      {removeError && (
-        <p className="border-b border-line bg-paper-raised px-4 py-2 font-mono text-[14px] text-accent sm:px-6">
-          [error] could not remove the database: {removeError.message}
-        </p>
-      )}
       {panel === 'connect' && <ConnectDatabaseForm onConnected={handleConnected} onCancel={() => setPanel(null)} />}
       {panel === 'schema' && active && (
         <SchemaBrowser databaseId={active.id} databaseName={active.name} onClose={() => setPanel(null)} />
       )}
-      {panel === 'llm-key' && <LlmKeyForm onClose={() => setPanel(null)} />}
       {panel === 'help' && <HelpPanel onClose={() => setPanel(null)} />}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6">
         <div className="mx-auto max-w-4xl">

@@ -157,34 +157,6 @@ describe('App', () => {
     expect(await screen.findByText(/0 tables, sampling: safe/)).toBeInTheDocument()
   })
 
-  it('opens the llm-key panel', async () => {
-    vi.mocked(client.fetchLlmKeyStatus).mockResolvedValue({
-      configured: false,
-      source: 'none',
-      model: 'gemini-3.8-flash',
-      base_url: 'https://example.test/',
-    })
-    render(<App />)
-    await screen.findByPlaceholderText(/ask a question/i)
-
-    await userEvent.click(screen.getByRole('button', { name: /configure the llm key/i }))
-    expect(await screen.findByLabelText(/api key/i)).toBeInTheDocument()
-  })
-
-  it('lets the user remove a database they added through the UI', async () => {
-    const uiDb: DatabaseInfo = { ...DATABASE, id: 'ui-1', name: 'ui_db', source: 'ui' }
-    vi.mocked(client.fetchDatabases).mockResolvedValue([DATABASE, uiDb])
-    vi.mocked(client.removeDatabase).mockResolvedValue(undefined)
-    render(<App />)
-
-    const select = await screen.findByLabelText(/connected database/i)
-    await userEvent.selectOptions(select, 'ui-1')
-    await userEvent.click(screen.getByRole('button', { name: /^remove$/i }))
-
-    await waitFor(() => expect(client.removeDatabase).toHaveBeenCalledWith('ui-1'))
-    await waitFor(() => expect(screen.queryByRole('option', { name: 'ui_db' })).not.toBeInTheDocument())
-  })
-
   it('restores completed turns from a previous session', async () => {
     const result = successResult()
     sessionStorage.setItem(

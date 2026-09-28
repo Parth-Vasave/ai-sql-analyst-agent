@@ -5,7 +5,6 @@ import {
   type DatabaseInfo,
   type DatabaseProfile,
   type HealthResponse,
-  type LlmKeyStatus,
   type QueryRequest,
 } from './types'
 
@@ -67,26 +66,7 @@ export function addDatabase(body: AddDatabaseRequest): Promise<DatabaseInfo> {
   })
 }
 
-export function removeDatabase(databaseId: string): Promise<void> {
-  return request<void>(`/api/databases/${encodeURIComponent(databaseId)}`, { method: 'DELETE' })
-}
-
 export function fetchProfile(databaseId: string, refresh = false): Promise<DatabaseProfile> {
   const query = refresh ? '?refresh=true' : ''
   return request<DatabaseProfile>(`/api/databases/${encodeURIComponent(databaseId)}/profile${query}`)
-}
-
-export function fetchLlmKeyStatus(): Promise<LlmKeyStatus> {
-  return request<LlmKeyStatus>('/api/llm-key')
-}
-
-export function setLlmKey(apiKey: string): Promise<LlmKeyStatus> {
-  return request<LlmKeyStatus>('/api/llm-key', {
-    method: 'POST',
-    body: JSON.stringify({ api_key: apiKey }),
-  })
-}
-
-export function removeLlmKey(): Promise<void> {
-  return request<void>('/api/llm-key', { method: 'DELETE' })
 }

@@ -110,17 +110,6 @@ export function HelpPanel({ onClose }: HelpPanelProps) {
           </p>
         </Section>
 
-        <Section title="setting the LLM key">
-          <p className="text-ink-dim">
-            <span className="text-accent">:llm-key</span> sets, replaces or removes the API key the
-            server uses to answer questions (any OpenAI-compatible provider — Gemini, Groq,
-            OpenRouter, ...). Like :connect, this is disabled unless the server sets
-            ALLOW_UI_LLM_KEY=true (local/self-hosted use only: it lets anyone who can reach the
-            server replace or clear the operator's key). The key itself is never shown back to you
-            or to anyone else, only whether one is configured and which provider/model it targets.
-          </p>
-        </Section>
-
         <Section title="the safety model">
           <p className="text-ink-dim">
             The LLM's SQL is never trusted on its own. It is parsed and checked against a syntax

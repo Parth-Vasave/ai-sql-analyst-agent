@@ -14,10 +14,7 @@ interface SessionHeaderProps {
   onToggleTheme: () => void
   onConnect: () => void
   onSchema: () => void
-  onLlmKey: () => void
   onHelp: () => void
-  onRemove: (id: string) => void
-  removing: boolean
 }
 
 export function SessionHeader({
@@ -28,10 +25,7 @@ export function SessionHeader({
   onToggleTheme,
   onConnect,
   onSchema,
-  onLlmKey,
   onHelp,
-  onRemove,
-  removing,
 }: SessionHeaderProps) {
   const active = databases.find((d) => d.id === activeId) ?? databases[0]
 
@@ -69,16 +63,6 @@ export function SessionHeader({
               </span>
               <StatusDot status={active.status} />
               <span className="hidden text-ink-dim sm:inline">{STATUS_LABEL[active.status]}</span>
-              {active.source === 'ui' && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(active.id)}
-                  disabled={removing}
-                  className="text-ink-faint underline decoration-line decoration-1 underline-offset-4 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {removing ? 'removing…' : 'remove'}
-                </button>
-              )}
             </>
           ) : (
             <span className="text-ink-faint">no database configured</span>
@@ -101,14 +85,6 @@ export function SessionHeader({
             aria-label="Connect a database"
           >
             :connect
-          </button>
-          <button
-            type="button"
-            onClick={onLlmKey}
-            className="rounded-none border border-line px-2 py-1 font-mono text-[12px] text-ink-dim transition-colors hover:border-ink-faint hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-            aria-label="Configure the LLM key"
-          >
-            :llm-key
           </button>
           <button
             type="button"
