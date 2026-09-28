@@ -1,0 +1,122 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Menlo', 'Consolas', monospace;
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', ui-sans-serif, sans-serif;
+
+  /* Light mode (default). Dark mode redefines the same custom properties below.
+     ink-dim and ink-faint are both tuned to clear 4.5:1 on --color-paper; only
+     the decorative separator dots and status dots go lighter than that. */
+  --color-paper: #faf9f7;
+  --color-paper-raised: #f1efec;
+  --color-ink: #16181c;
+  --color-ink-dim: #5b6169;
+  --color-ink-faint: #666c74;
+  --color-line: #dbdcdc;
+
+  /* The one reserved signal color: held/alert/retry state, and nothing else — a rejected
+     (non-read-only) connection reuses it too, since that genuinely is an alert. A healthy
+     connection is reported in plain ink, not a second hue: "ready" is the unremarkable case.
+     Darkened from the "true" amber so it clears 4.5:1 as body text on paper. */
+  --color-accent: #9a5a1f;
+  --color-accent-soft: #f1e3d1;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --color-paper: #111215;
+    --color-paper-raised: #191a1e;
+    --color-ink: #e7e8ea;
+    --color-ink-dim: #9a9fa6;
+    --color-ink-faint: #7d838b;
+    --color-line: #2b2d31;
+
+    --color-accent: #d99a4e;
+    --color-accent-soft: #3a2c1a;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-paper: #111215;
+  --color-paper-raised: #191a1e;
+  --color-ink: #e7e8ea;
+  --color-ink-dim: #9a9fa6;
+  --color-ink-faint: #7d838b;
+  --color-line: #2b2d31;
+
+  --color-accent: #d99a4e;
+  --color-accent-soft: #3a2c1a;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Browser surfaces belong to the palette too: selection, caret, focus, scrollbars. */
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+input,
+select {
+  caret-color: var(--color-accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-color: var(--color-ink-faint) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-ink-faint);
+  border: 2px solid var(--color-paper);
+  border-radius: 999px;
+}
+
+/* The one authored motion moment: a real terminal cursor while a question runs. */
+@keyframes cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
