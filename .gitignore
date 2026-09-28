@@ -29,8 +29,6 @@ dist/
 .vscode/
 .DS_Store
 
-# Impeccable design tooling: local review captures and build state (PRODUCT.md, DESIGN.md and
-# .impeccable/surfaces/ are durable project context and are committed)
-.impeccable/review/
-.impeccable/build/
-.impeccable/mocks/
+# Impeccable design tooling: local-only working state, not committed (PRODUCT.md and DESIGN.md
+# carry the durable project/design context instead)
+.impeccable/
