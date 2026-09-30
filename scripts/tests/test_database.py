@@ -23,7 +23,11 @@ def test_seed_loads_every_cleaned_row(seeded_db: str, tmp_path: Path) -> None:
     clean_data.run(FIXTURE, output_dir=tmp_path)
     report = json.loads((tmp_path / clean_data.REPORT_NAME).read_text())
     with psycopg.connect(seeded_db) as conn:
-        counts = {t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in DATA_TABLES}  # noqa: S608
+        counts = {}
+        for table in DATA_TABLES:
+            row = conn.execute(f"SELECT count(*) FROM {table}").fetchone()  # noqa: S608
+            assert row is not None
+            counts[table] = row[0]
     assert counts == {"countries": 9, **report["rows_written"]}
 
 

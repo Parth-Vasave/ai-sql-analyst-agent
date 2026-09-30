@@ -18,7 +18,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.conninfo import make_conninfo
 
 from scripts import clean_data, seed_database
 
@@ -36,9 +36,7 @@ def admin_url() -> str:
 
 @pytest.fixture(scope="session")
 def agent_url(admin_url: str) -> str:
-    params = conninfo_to_dict(admin_url)
-    params.update(user="sql_agent", password=os.environ["TEST_SQL_AGENT_PASSWORD"])
-    return make_conninfo(**params)
+    return make_conninfo(admin_url, user="sql_agent", password=os.environ["TEST_SQL_AGENT_PASSWORD"])
 
 
 @pytest.fixture(scope="session")

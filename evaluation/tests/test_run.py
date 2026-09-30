@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, Literal
 
 from app.agent.controller import AgentResult, QueryError, QueryMetadata, TraceEvent
 from evaluation.report import compute, render
@@ -17,20 +19,24 @@ META = {
     "code_commit": "c",
     "dataset_commit": "d",
 }
-QUESTIONS = [
+QUESTIONS: list[dict[str, Any]] = [
     {"id": "Q1", "category": "ranking", "expected_behavior": "query", "question": "top?",
      "ground_truth": {"sql": "-", "order_matters": True}},
     {"id": "Q2", "category": "ambiguous", "expected_behavior": "clarify", "question": "trend?"},
     {"id": "Q3", "category": "no_result", "expected_behavior": "empty", "question": "none?"},
 ]  # fmt: skip
-EXPECTED = {
+EXPECTED: dict[str, list[dict[str, Any]]] = {
     "Q1": [{"columns": ["name"], "rows": [["China"], ["India"]]}],
     "Q3": [{"columns": ["name"], "rows": []}],
 }
 
 
 def result(
-    status: str = "success", rows=None, error: QueryError | None = None, retries: int = 0, trace=()
+    status: Literal["success", "needs_clarification", "unanswerable", "error"] = "success",
+    rows: list[list[Any]] | None = None,
+    error: QueryError | None = None,
+    retries: int = 0,
+    trace: Sequence[TraceEvent] = (),
 ) -> AgentResult:
     meta = QueryMetadata(
         database_id="x", dialect="postgres", model="m", prompt_version="p", retry_count=retries
@@ -92,11 +98,21 @@ def test_model_errors_are_scored_not_skipped(tmp_path: Path) -> None:
 def test_resume_skips_scored_questions_and_retries_provider_failures(tmp_path: Path) -> None:
     calls: list[str] = []
     first = iter([good(QUESTIONS[0]), result("error", error=QUOTA), result("error", error=QUOTA)])
-    run(tmp_path, lambda item: calls.append(item["id"]) or next(first), max_provider_failures=5)
+
+    def ask_first(item: dict[str, Any]) -> AgentResult:
+        calls.append(item["id"])
+        return next(first)
+
+    run(tmp_path, ask_first, max_provider_failures=5)
     assert calls == ["Q1", "Q2", "Q3"]
 
     calls.clear()
-    summary, records, _ = run(tmp_path, lambda item: calls.append(item["id"]) or good(item))
+
+    def ask_good(item: dict[str, Any]) -> AgentResult:
+        calls.append(item["id"])
+        return good(item)
+
+    summary, records, _ = run(tmp_path, ask_good)
     assert calls == ["Q2", "Q3"]  # Q1 was already scored
     assert all(records[i]["correct"] for i in ("Q1", "Q2", "Q3"))
 

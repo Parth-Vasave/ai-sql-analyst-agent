@@ -17,9 +17,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 known-first-party = ["app", "scripts"]
 
 [tool.mypy]
-# Application code only; tests are checked by running them.
-files = ["backend/app", "scripts", "evaluation"]
-exclude = ["^scripts/tests/", "^evaluation/tests/"]
+files = ["backend/app", "backend/tests", "scripts", "evaluation"]
+explicit_package_bases = true
 mypy_path = "backend"
 python_version = "3.11"
 disallow_untyped_defs = true  # CLAUDE.md: type hints everywhere
@@ -28,6 +27,14 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 
 [[tool.mypy.overrides]]
-# pandas ships no type information (and pandas-stubs would be one more dependency).
-module = ["pandas", "pandas.*"]
+# pandas ships no type information (and pandas-stubs would be one more dependency); numpy's
+# stubs use syntax newer than the python_version above, so neither is followed.
+module = ["pandas", "pandas.*", "numpy", "numpy.*"]
 ignore_missing_imports = true
+follow_imports = "skip"
+follow_imports_for_stubs = true
+
+[[tool.mypy.overrides]]
+# Tests are type-checked, but their fixtures and test functions need no annotations.
+module = ["tests.*", "scripts.tests.*", "evaluation.tests.*"]
+disallow_untyped_defs = false

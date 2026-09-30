@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from starlette.requests import Request
 
@@ -97,7 +99,7 @@ def test_client_table_stays_bounded(clock: FakeClock) -> None:
 
 def make_request(peer: str | None, forwarded: list[str] | None = None) -> Request:
     headers = [(b"x-forwarded-for", value.encode()) for value in forwarded or []]
-    scope = {"type": "http", "method": "POST", "path": "/", "headers": headers}
+    scope: dict[str, Any] = {"type": "http", "method": "POST", "path": "/", "headers": headers}
     if peer is not None:
         scope["client"] = (peer, 50000)
     return Request(scope)

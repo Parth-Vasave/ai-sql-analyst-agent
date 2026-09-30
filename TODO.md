@@ -207,8 +207,12 @@ Milestone 13 — Tests, Docker, README, Vercel deployment, polish
       evaluation, in the CI lint job. It found 15 errors, fixed: annotations naming sqlglot's
       `Expression` where the base class is now `Expr`; a trace status typed as plain str; a
       profiler path that could reflect schema None; a type narrowing lost behind a boolean.
-      No behaviour change (all suites pass). Tests are not type-checked (24 errors, mostly
-      loosely typed fixtures); a possible follow-up
+      No behaviour change (all suites pass).
+* [x] Code-quality pass (2026-09-30): tests are type-checked too (24 errors fixed: Optional results
+      now asserted before use, typed fixtures; test functions may stay unannotated); the three
+      frontend lint warnings fixed (state derived instead of set inside effects); CI gained a
+      frontend job (oxlint, tsc + build, vitest on Node 22) and an audit job (pip-audit, npm audit).
+      The database-backed tests were not run locally in this pass (no test credentials): CI runs them
 * [x] Replay tests in CI (evaluation/tests/test_replay.py): the evaluation pipeline end to end with
       scripted LLM replies, on the fixture data. All 55 query questions' ground-truth SQL pass the
       validator and score correct through runner, agent, scoring and report; a wrong answer scores

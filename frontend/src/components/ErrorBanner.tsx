@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { ApiError } from '../api/types'
 
 export function ErrorBanner({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
-  const [remaining, setRemaining] = useState(error.retryAfterSeconds ?? 0)
+  const [countdown, setCountdown] = useState({ error, elapsed: 0 })
+  if (countdown.error !== error) setCountdown({ error, elapsed: 0 })
+  const remaining = Math.max(0, (error.retryAfterSeconds ?? 0) - countdown.elapsed)
 
   useEffect(() => {
-    setRemaining(error.retryAfterSeconds ?? 0)
     if (!error.retryAfterSeconds) return
-    const interval = setInterval(() => setRemaining((s) => Math.max(0, s - 1)), 1000)
+    const interval = setInterval(() => setCountdown((c) => ({ ...c, elapsed: c.elapsed + 1 })), 1000)
     return () => clearInterval(interval)
   }, [error])
 

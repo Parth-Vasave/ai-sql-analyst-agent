@@ -9,18 +9,30 @@ interface SchemaBrowserProps {
 }
 
 export function SchemaBrowser({ databaseId, databaseName, onClose }: SchemaBrowserProps) {
-  const [profile, setProfile] = useState<DatabaseProfile | null>(null)
-  const [error, setError] = useState<ApiError | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState<{
+    databaseId: string
+    profile: DatabaseProfile | null
+    error: ApiError | null
+  } | null>(null)
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
+    let cancelled = false
     fetchProfile(databaseId)
-      .then(setProfile)
-      .catch((err: unknown) => setError(err instanceof ApiError ? err : new ApiError('Could not load the schema.', 0)))
-      .finally(() => setLoading(false))
+      .then((profile) => !cancelled && setLoaded({ databaseId, profile, error: null }))
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const error = err instanceof ApiError ? err : new ApiError('Could not load the schema.', 0)
+        setLoaded({ databaseId, profile: null, error })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [databaseId])
+
+  const current = loaded?.databaseId === databaseId ? loaded : null
+  const profile = current?.profile ?? null
+  const error = current?.error ?? null
+  const loading = current === null
 
   return (
     <div className="border-b border-line bg-paper-raised px-4 py-4 sm:px-6">

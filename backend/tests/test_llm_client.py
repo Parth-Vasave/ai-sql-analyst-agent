@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
 import pytest
@@ -33,7 +34,7 @@ def _reply(content: str) -> dict:
 
 
 def test_sends_openai_compatible_request_and_parses_json() -> None:
-    seen = {}
+    seen: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["url"] = str(request.url)

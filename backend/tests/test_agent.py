@@ -119,6 +119,7 @@ def test_sql_error_is_classified_and_reported(shop) -> None:
     llm = ScriptedLLMClient(lambda s, u: reply(sql))
     result = AgentController(llm, max_rows=100, max_retries=0).run("Which orders?", shop)
     assert result.status == "error"
+    assert result.error is not None
     assert result.error.category == "type_mismatch"
     assert "invalid input syntax" in result.error.message
     assert result.sql == sql
@@ -129,6 +130,7 @@ def test_unknown_column_is_rejected_before_execution(shop) -> None:
     llm = ScriptedLLMClient(lambda s, u: reply("SELECT states FROM shop.orders LIMIT 5"))
     result = AgentController(llm, max_rows=100, max_retries=0).run("Which state?", shop)
     assert result.status == "error"
+    assert result.error is not None
     assert (result.error.category, result.error.code) == ("validation", "unknown_column")
     assert result.sql == "SELECT states FROM shop.orders LIMIT 5"  # the rejected SQL is shown
     assert result.trace[-2].step == "sql_validation" and result.trace[-2].status == "failed"
@@ -200,12 +202,14 @@ def test_timeout_is_classified(shop) -> None:
     slow = "SELECT count(*) AS n FROM generate_series(1, 1000000000) AS g"
     llm = ScriptedLLMClient(lambda s, u: reply(slow))
     result = AgentController(llm, max_rows=10).run("slow", shop)
+    assert result.error is not None
     assert result.error.category == "timeout"
 
 
 def test_sleep_is_rejected_by_the_validator_and_stopped_by_the_database_timeout(shop) -> None:
     llm = ScriptedLLMClient(lambda s, u: reply("SELECT pg_sleep(5)"))
     result = AgentController(llm, max_rows=10).run("slow", shop)
+    assert result.error is not None
     assert (result.error.category, result.error.code) == ("validation", "forbidden_function")
     with pytest.raises(QueryExecutionError) as info:  # second layer, if the validator were bypassed
         execute(shop, "SELECT pg_sleep(5)", max_rows=10)
@@ -215,6 +219,7 @@ def test_sleep_is_rejected_by_the_validator_and_stopped_by_the_database_timeout(
 def test_writes_are_rejected_by_the_validator_and_by_the_database(shop) -> None:
     llm = ScriptedLLMClient(lambda s, u: reply("DELETE FROM shop.orders"))
     result = AgentController(llm, max_rows=10).run("delete everything", shop)
+    assert result.error is not None
     assert (result.error.category, result.error.code) == ("validation", "not_select")
     assert "query_execution" not in [e.step for e in result.trace]
     with pytest.raises(QueryExecutionError) as info:  # second layer, if the validator were bypassed
@@ -283,6 +288,7 @@ def test_timeout_asks_for_a_cheaper_query(shop) -> None:
 def test_retries_are_bounded(shop) -> None:
     llm = sequence(*(reply(f"SELECT bad_{i} FROM shop.orders LIMIT 1") for i in range(5)))
     result = AgentController(llm, max_rows=100, max_retries=2).run("?", shop)
+    assert result.error is not None
     assert result.status == "error" and result.error.code == "unknown_column"
     assert len(llm.calls) == 3 and result.metadata.retry_count == 2
     assert result.sql == "SELECT bad_2 FROM shop.orders LIMIT 1"  # the last attempt is reported
@@ -304,6 +310,7 @@ def test_repeating_the_same_sql_stops_the_loop(shop) -> None:
 def test_unsafe_sql_is_not_sent_back_for_repair(shop, sql: str) -> None:
     llm = sequence(reply(sql), reply("SELECT id FROM shop.orders LIMIT 1"))
     result = AgentController(llm, max_rows=100).run("?", shop)
+    assert result.error is not None
     assert result.status == "error" and result.error.category == "validation"
     assert len(llm.calls) == 1 and result.metadata.retry_count == 0
 
@@ -415,6 +422,7 @@ def test_answer_with_an_invented_number_falls_back_to_the_template(shop) -> None
     result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=answer_llm).run(
         "Orders per status?", shop
     )
+    assert result.answer is not None
     assert result.answer_source == "template" and "60" not in result.answer
     step = next(e for e in result.trace if e.step == "answer_generation")
     assert step.status == "failed" and step.detail["ungrounded_numbers"] == ["60"]
@@ -429,7 +437,9 @@ def test_answer_model_failure_falls_back_to_the_template(shop) -> None:
 def test_rows_are_not_sent_to_the_llm_when_sampling_is_off(pg) -> None:
     registry = ConnectionRegistry(timeout_seconds=2)
     private = registry.add(
-        ConnectionConfig(id="p", name="P", url=SecretStr(pg.agent), schemas=["shop"], sampling="off")
+        ConnectionConfig(
+            id="p", name="P", url=SecretStr(pg.agent), schemas=["shop"], sampling=SamplingMode.OFF
+        )
     )
     answer_llm = answering("unused")
     result = AgentController(sequence(reply(STATUS_SQL)), max_rows=100, answer_llm=answer_llm).run(

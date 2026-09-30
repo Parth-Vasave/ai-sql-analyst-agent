@@ -45,6 +45,16 @@ export default function App() {
   )
   const transcriptEnd = useRef<HTMLDivElement>(null)
 
+  function loadDatabases() {
+    fetchDatabases()
+      .then((list) => {
+        setDatabasesError(null)
+        setDatabases(list)
+        setActiveId((current) => current ?? list.find((d) => d.status === 'ready')?.id ?? list[0]?.id ?? null)
+      })
+      .catch((error: unknown) => setDatabasesError(error instanceof ApiError ? error : new ApiError('Could not load databases.', 0)))
+  }
+
   useEffect(() => {
     loadDatabases()
   }, [])
@@ -55,16 +65,6 @@ export default function App() {
       turns.filter((t): t is LocalTurn & { result: AgentResult } => t.result != null).map((t) => ({ id: t.id, question: t.question, result: t.result })),
     )
   }, [turns])
-
-  function loadDatabases() {
-    setDatabasesError(null)
-    fetchDatabases()
-      .then((list) => {
-        setDatabases(list)
-        setActiveId((current) => current ?? list.find((d) => d.status === 'ready')?.id ?? list[0]?.id ?? null)
-      })
-      .catch((error: unknown) => setDatabasesError(error instanceof ApiError ? error : new ApiError('Could not load databases.', 0)))
-  }
 
   function submit(question: string, retryOf?: string) {
     const id = retryOf ?? crypto.randomUUID()
