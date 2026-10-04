@@ -9,7 +9,7 @@ web
 ## Stack
 
 Vite + React + TypeScript + Tailwind + Recharts (confirmed by the owner; matches the earlier,
-since-removed Milestone 12 attempt — see TODO.md and commit `ae1cca7`).
+since-removed Milestone 12 attempt — see commit `ae1cca7`).
 
 ## Users
 
@@ -59,7 +59,7 @@ LLM's SQL, and here's the test suite that proves it."
 
 ## Capabilities and Constraints
 
-- Backend is feature-complete through Milestone 11 of TODO.md: SQL generation, AST validation,
+- Backend is feature-complete through Milestone 11: SQL generation, AST validation,
   LIMIT enforcement, auto-repair (max 2 retries), deterministic result checks with missing-value
   probes, grounded answer generation with unit tracking, deterministic chart selection, structured
   tracing, rate limiting. All of this is real and already exercised by tests and live checks.
@@ -70,7 +70,7 @@ LLM's SQL, and here's the test suite that proves it."
     validation rejection, timeout, API unreachable, no LLM configured, clarification needed,
     unanswerable/no-result question.
 - The 73-question evaluation suite is built but has **not** been run to completion with a real
-  LLM (blocked on free-tier quota; 1 of 73 scored so far — see TODO.md). The frontend must never
+  LLM (blocked on free-tier quota; 1 of 73 scored so far — see EVALUATION_PLAN.md). The frontend must never
   display invented accuracy/quality numbers. If evaluation results are shown at all, they must be
   read from the actual recorded report, and must say plainly that the run is partial/not yet done
   if that's still true when the frontend ships.

@@ -4,7 +4,7 @@ Project Role
 
 You are the primary software engineer working on this repository.
 
-Build a production-quality AI SQL Analyst application according to the project specification (kept locally, not committed; see TODO.md for the milestone plan).
+Build a production-quality AI SQL Analyst application according to the project specification (kept locally, not committed).
 
 Before implementing functionality, inspect the repository and understand its current state.
 
@@ -27,15 +27,14 @@ Before modifying code:
 
 Do not attempt to build the entire application in one pass.
 
-Implement the project milestone-by-milestone according to TODO.md.
+Implement the project milestone-by-milestone.
 
 After completing a meaningful milestone:
 
 1. Run relevant tests.
 2. Run lint/type checks where applicable.
 3. Verify the application actually works.
-4. Update TODO.md.
-5. Update documentation if the architecture changed.
+4. Update documentation if the architecture changed.
 
 3. Avoid Overengineering
 
@@ -122,15 +121,12 @@ Development Workflow
 At the beginning of each major task:
 
 1. Read the project specification if available locally.
-2. Read TODO.md.
-3. Inspect the current repository.
-4. Determine what has already been implemented.
-5. Identify the smallest useful next step.
-6. Implement it.
-7. Test it.
-8. Update project state.
-
-When a task is complete, update TODO.md.
+2. Inspect the current repository.
+3. Determine what has already been implemented.
+4. Identify the smallest useful next step.
+5. Implement it.
+6. Test it.
+7. Update project state.
 
 If a major architectural decision is made, document it.
 

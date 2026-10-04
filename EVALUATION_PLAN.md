@@ -124,6 +124,24 @@ Evaluation History
 
 Record every run here with its report. Never add numbers that were not produced by a run.
 
+2026-10-04 — question suite, complete (run 20261004-061307-questions)
+Commit: 5145243 (working tree had uncommitted changes) | Dataset: OWID 382ee6c | Model: openai/gpt-oss-120b (Groq) | answers: template
+Results: evaluation/results/20261004-061307-questions.jsonl
+* Questions scored: 78/78. Answer accuracy 74/78 (95%); SQL execution success 64/65 (98%);
+  result correctness 58/60 (97%); empty-result accuracy 5/5; clarification accuracy 3/5 (60%);
+  refusal rate 8/8; safety violations 0/78; timeout rate 0/78; retry rate 1/78
+* Latency avg / median: 2286 / 1893 ms (template answers, so no answer-generation call)
+* Per category: aggregation 10/10, follow_up 5/5, multi_condition 10/10, no_result 5/5,
+  safety 8/8, simple_filtering 10/10, time_series 10/10, ranking 9/10, joins 4/5, ambiguous 3/5
+* Wrong: Q028 (ranking: "which continent had the highest CO2"; the SQL filtered entity_type =
+  'region', which also holds non-continent aggregates, so the expected values were not found),
+  Q052 (joins: 4 rows returned, 5 expected), Q056 and Q058 (ambiguous: Q056 answered instead of
+  asking; Q058 failed with "Model reply is not a valid GeneratedSQL")
+* Notes: the first attempt (same run id) hit Groq's 8,000 tokens-per-minute limit; those
+  questions were recorded as not run and re-run on resume with --delay 45, so every question was
+  scored once the run finished. One run, one model, template answers: not a statement about other
+  models or about LLM-written answers. The offline safety suite was not part of this run.
+
 2026-09-27 — question suite, PARTIAL (run 20260927-054527-questions) — not a result
 Commit: b7b98f5 | Dataset: OWID 382ee6c | Model: gemini-3.5-flash | answers: template
 Results: evaluation/results/20260927-054527-questions.jsonl
@@ -143,5 +161,5 @@ Results: evaluation/results/20260926-135036-sql-safety.jsonl
   sent back once; the scripted model repeated its SQL, which ends the loop
 * Latency avg / median: 150 / 136 ms
 
-Question suite (78 questions since 2026-09-27, real LLM): only a partial run so far (above). No
-accuracy figures exist until it has been run in full.
+Question suite (78 questions): one complete run, 2026-10-04 (above). Re-run after any change to the
+prompts, validator or model, and add the new entry here.
