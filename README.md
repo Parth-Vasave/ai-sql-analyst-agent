@@ -181,7 +181,10 @@ tests in CI check the evaluation machinery with scripted replies and say nothing
 - Public deployment (Vercel + Neon) is not done yet.
 - Results depend on the chosen model; only one model has been evaluated so far.
 
-## Data and licence
+## Licence and data
+
+Code: [MIT](LICENSE). Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md); security
+reports: [SECURITY.md](SECURITY.md).
 
 Demo data: *Our World in Data, "CO₂ and Greenhouse Gas Emissions"*,
 <https://github.com/owid/co2-data>, CC BY 4.0, pinned by commit and SHA-256. Cleaning rules and

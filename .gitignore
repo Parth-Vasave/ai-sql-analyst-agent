@@ -32,3 +32,7 @@ dist/
 # Impeccable design tooling: local-only working state, not committed (PRODUCT.md and DESIGN.md
 # carry the durable project/design context instead)
 .impeccable/
+
+# Third-party Claude Code skills/agents installed locally (not part of this project)
+.claude/skills/
+.claude/agents/

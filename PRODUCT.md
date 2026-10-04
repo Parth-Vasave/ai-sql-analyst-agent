@@ -39,7 +39,7 @@ omission. This project's mechanism is the opposite and is falsifiable: an AST va
 (sqlglot) rejects anything that is not a single read-only SELECT against known tables/columns, a
 read-only database role and statement timeout back that up independently, every generated query is
 re-derived from the validated tree before it runs, and there's an offline adversarial safety suite
-(28 attack statements) plus a 73-question evaluation harness with result-based scoring — recorded,
+(28 attack statements) plus a 78-question evaluation harness with result-based scoring — recorded,
 not claimed. A neighboring "AI analyst" product could not truthfully copy "we never trust the
 LLM's SQL, and here's the test suite that proves it."
 
@@ -69,18 +69,14 @@ LLM's SQL, and here's the test suite that proves it."
   - Errors the frontend must present, each with its own recovery: rate limited, provider error,
     validation rejection, timeout, API unreachable, no LLM configured, clarification needed,
     unanswerable/no-result question.
-- The 73-question evaluation suite is built but has **not** been run to completion with a real
-  LLM (blocked on free-tier quota; 1 of 73 scored so far — see EVALUATION_PLAN.md). The frontend must never
+- The 78-question evaluation suite has one complete run with a real LLM (2026-10-04,
+  `openai/gpt-oss-120b`, 74/78 answers correct; see EVALUATION_PLAN.md). The frontend must never
   display invented accuracy/quality numbers. If evaluation results are shown at all, they must be
-  read from the actual recorded report, and must say plainly that the run is partial/not yet done
-  if that's still true when the frontend ships.
-- No frontend code exists right now. An earlier build (Vite/React/TS/Tailwind/Recharts, an
-  EXPLAIN-plan-tree page in an "open-source voice") was completed and then deliberately removed by
-  the owner ("build it later") — it remains in git history at commit `ae1cca7` / `50ee27e` as
-  reference, not as a base to restore verbatim.
-- No public repo URL, license, or star count exists yet (owner confirmed). Any open-source-style
-  chrome (repo link, license badge, contributor count, stars) must stay generic/omitted rather than
-  invented.
+  read from the actual recorded report, with the run, model and date they came from.
+- The frontend (Milestone 12) lives in `frontend/`. An earlier build was removed and remains in git
+  history at commit `ae1cca7` / `50ee27e` as reference only.
+- The code is MIT-licensed and public at https://github.com/Parth-Vasave/ai-sql-analyst-agent.
+  Star, contributor and usage counts must never be invented.
 
 ## Brand Commitments
 
@@ -94,9 +90,10 @@ plainly, not from persuading a visitor. No name/pseudonym for authorship has bee
 - Dataset: Our World in Data, "CO2 and Greenhouse Gas Emissions" (CC BY 4.0), pinned commit
   `382ee6c662b0ece26e111f263b44c029afad7787`, 1750-2024, 254 entities (242 after cleaning), 50,411
   rows x 79 source columns (`data/README.md`). Real, citable, safe to reference directly.
-- No real GitHub URL, license badge, or usage/star metrics exist. Do not fabricate any.
-- No evaluation accuracy numbers exist yet beyond the offline safety suite (28/28 blocked, 0
-  violations, recorded 2026-09-26) and the single scored question from the interrupted live run.
+- Repository: https://github.com/Parth-Vasave/ai-sql-analyst-agent (MIT). Do not fabricate usage
+  or star metrics.
+- Recorded evaluation: offline safety suite 28/28 blocked (2026-10-04) and one complete question
+  suite run, 74/78 (2026-10-04). EVALUATION_PLAN.md is the source of truth.
 
 ## Product Principles
 
