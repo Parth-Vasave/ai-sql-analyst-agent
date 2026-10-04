@@ -136,6 +136,13 @@ ruff check . && ruff format --check . && mypy
 cd frontend && npm run lint && npm run typecheck && npm test
 ```
 
+The SQL validator also has offline property tests (no database or LLM): from `backend`, run
+`python -m pytest tests/test_sql_validator_properties.py --hypothesis-show-statistics`.
+They build sqlglot ASTs for read queries and rejected operations, check the regenerated outer
+row limit and idempotence, and exercise arbitrary text. Each property uses seed `20261005`,
+at most 50 generated examples, AST nesting at most two levels, and text at most 256 characters;
+Hypothesis's example database is disabled. This makes CI reproducible, not a proof of SQL safety.
+
 The database-backed tests need a disposable PostgreSQL database (`TEST_ADMIN_DATABASE_URL`,
 `TEST_SQL_AGENT_PASSWORD`; the tests reset the `sql_agent` password cluster-wide, so never point
 them at a real cluster). CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same
