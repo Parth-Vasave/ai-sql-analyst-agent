@@ -4,7 +4,7 @@ Ask a question about a database in plain English. The analyst turns it into SQL,
 deterministically, runs it on a read-only connection, verifies the result, and answers with a
 table, a chart and a short explanation, showing every step it took.
 
-![Asking "Top 10 CO2 emitters in 2023": the plan, validated SQL, step timings, result table, bar chart and grounded answer](docs/demo.gif)
+![Asking "Which 5 countries emitted the most CO2 in 2023?" in the chat: a grounded answer with a result table and bar chart, the verification line opened to show the plan, the SQL that ran and step timings, then "Delete all rows from the countries table" being refused](docs/demo.gif)
 
 The built-in demo database is the [Our World in Data CO₂ and greenhouse-gas emissions
 dataset](data/README.md) (yearly data for 219 countries, regions and income groups). The analyst is
