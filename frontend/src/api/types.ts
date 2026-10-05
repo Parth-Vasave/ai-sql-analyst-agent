@@ -72,6 +72,7 @@ export interface QueryError {
   category: string
   message: string
   code: string | null
+  retry_after_seconds?: number | null
 }
 
 export interface QueryMetadata {

@@ -397,7 +397,7 @@ def test_provider_error_fails_fast_without_repair(shop) -> None:
 
     assert result.status == "error" and result.metadata.retry_count == 0
     assert result.error is not None and result.error.category == "llm_error"
-    assert "HTTP 401" in result.error.message
+    assert "HTTP 401" in result.error.message and result.error.code == "auth"
     assert ("sql_generation", "failed") in steps(result)
     assert "sql_repair" not in [e.step for e in result.trace]  # no repair attempt was made
 
