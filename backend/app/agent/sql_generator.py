@@ -132,7 +132,7 @@ def generate_sql(
     return llm.complete_json(system, build_user_prompt(question, context, history), GeneratedSQL)
 
 
-REPAIR_PROMPT_VERSION = "sql-repair/2"
+REPAIR_PROMPT_VERSION = "sql-repair/3"
 
 _REPAIR_HINTS = {
     "timeout": (

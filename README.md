@@ -4,6 +4,12 @@ Ask a question about a database in plain English. The analyst turns it into SQL,
 deterministically, runs it on a read-only connection, verifies the result, and answers with a
 table, a chart and a short explanation, showing every step it took.
 
+![Asking "Top 10 CO2 emitters in 2023": the plan, validated SQL, step timings, result table, bar chart and grounded answer](docs/demo.gif)
+
+The built-in demo database is the [Our World in Data CO₂ and greenhouse-gas emissions
+dataset](data/README.md) (yearly data for 219 countries, regions and income groups). The analyst is
+database-agnostic: any PostgreSQL database you connect is profiled automatically.
+
 > **The LLM is never trusted.** It only drafts SQL and wording. Safety comes from deterministic
 > code and database permissions: an AST validator, a read-only account, a statement timeout and
 > row limits. See [Security model](#security-model).
@@ -24,7 +30,7 @@ question ─▶ schema retrieval ─▶ LLM: plan + SQL ─▶ AST validation �
 | Plan + SQL | LLM | One call returns a structured plan (intent, tables, metrics, filters, assumptions) and the SQL. It may ask a clarifying question instead when no reading is a reasonable default. |
 | Validation | deterministic | `sqlglot` AST checks, row limit enforced (see below). The SQL that runs is regenerated from the validated tree. |
 | Execution | deterministic | Read-only connection, statement timeout, client-side row cap. |
-| Repair | LLM, bounded | A repairable failure (validator rejection, SQL error, timeout, bad result) is sent back to the model at most `MAX_RETRIES` times; every repair is validated again. Unsafe intent is never retried. |
+| Repair | LLM, bounded | A repairable failure (validator rejection, SQL error, timeout, bad result, malformed model reply) is sent back to the model at most `MAX_RETRIES` times; every repair is validated again. Unsafe intent is never retried. |
 | Result checks | deterministic | Empty result, aggregate over nothing, ranking led by NULL, NULL-only column, row limit reached, duplicates. Missing-value probes catch misspelled filter values (e.g. `'Ivory Coast'`). |
 | Chart | deterministic | Chosen from column kinds and values: stat tile, line, bar, scatter or none. The model's suggestion is only a tie-breaker. |
 | Answer | LLM + check | 1–3 sentences. Every number must come from the rows; otherwise a template answer built from the rows is used. |
@@ -52,32 +58,8 @@ no conversation state. New SQL is validated exactly like any other.
 5. **Data sent to the LLM provider.** The schema, sampled values (configurable per database:
    `off | safe | full`) and up to 30 result rows for the answer step. Databases with sampling `off`
    get template answers, so rows never leave.
-6. **UI-added connections** (`ALLOW_UI_CONNECTIONS`) are for local use only. Never enable it on a public
-   deployment: it makes the server connect to arbitrary hosts.
-
-## What's new (deployment guide)
-
-This repository previously had no public deployment path. See
-[docs/deployment.md](docs/deployment.md) for the complete, tested guide:
-
-- One low-cost public stack: **Neon + Vercel + Railway**.
-- Neon database creation, the read-only `sql_agent` role configured from `database/permissions.sql`,
-  and the seed pipeline — the exact commands, tied to the repository's real scripts (`scripts/ingest_data.py`,
-  `scripts/clean_data.py`, `scripts/seed_database.py`, `database/init/00_init.sh`).
-- Step-by-step backend deployment on Railway, including the Dockerfile, the port (`8000`), the start
-  command, environment variables, and how to find the backend URL.
-- Vercel frontend deployment (root directory `frontend/`, build `tsc -b && vite build`, output `dist`),
-  CORS, and `VITE_API_BASE_URL`.
-- Environment variable tables for backend and frontend, with the secret list (`LLM_API_KEY`,
-  `DATABASE_URL`, `DATABASES_CONFIG`, `POSTGRES_PASSWORD`, `SQL_AGENT_PASSWORD`, `ADMIN_DATABASE_URL`)
-  that must never reach the frontend.
-- `ALLOW_UI_CONNECTIONS=false` explicitly required.
-- `TRUSTED_PROXY_HOPS` explained for Railway (`0` until you add your own proxy).
-- Rate limits in relation to LLM quota (1–4 LLM calls per question), plus the in-memory/per-process
-  limitation, Cross-referenced with [Issue #7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7).
-- Post-deployment verification: `GET /api/health`, one successful `POST /api/query`, one rejected query,
-  and a frontend bundle check.
-- Troubleshooting, known limitations, and alternative container hosts.
+6. **UI-added connections** (`ALLOW_UI_CONNECTIONS`) are for local use only. Never enable it on a
+   public deployment: it makes the server connect to arbitrary hosts.
 
 ## Observability
 
@@ -105,8 +87,11 @@ Try it without the UI:
 
 ```bash
 curl -s localhost:8000/api/query -H 'content-type: application/json' \
-  -d '{"database_id": "owid", "question": "Top 5 CO2 emitters in 2023"}'
+  -d '{"question": "Top 5 CO2 emitters in 2023"}'
 ```
+
+Without `database_id` the first ready database is used (`default` for a single `DATABASE_URL`).
+To deploy publicly, follow [docs/deployment.md](docs/deployment.md).
 
 ### Configuration
 
@@ -154,17 +139,25 @@ ruff check . && ruff format --check . && mypy
 cd frontend && npm run lint && npm run typecheck && npm test
 ```
 
+The SQL validator also has offline property tests (no database or LLM): from `backend`, run
+`python -m pytest tests/test_sql_validator_properties.py --hypothesis-show-statistics`.
+They build sqlglot ASTs for read queries and rejected operations, check the regenerated outer
+row limit and idempotence, and exercise arbitrary text. Each property uses seed `20261005`,
+at most 50 generated examples, AST nesting at most two levels, and text at most 256 characters;
+Hypothesis's example database is disabled. This makes CI reproducible, not a proof of SQL safety.
+
 The database-backed tests need a disposable PostgreSQL database (`TEST_ADMIN_DATABASE_URL`,
-`TEST_SQL_AGENT_PASSWORD`; the tests reset the `sql_agent` password cluster-wide, so never point them
-at a real cluster). CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same checks on
-Python 3.11 and 3.12 against PostgreSQL 16, fails if any test is skipped, and adds frontend and
-dependency-audit jobs.
+`TEST_SQL_AGENT_PASSWORD`; the tests reset the `sql_agent` password cluster-wide, so never point
+them at a real cluster). CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the same
+checks on Python 3.11 and 3.12 against PostgreSQL 16, fails if any test is skipped, and adds
+frontend and dependency-audit jobs.
 
 ## Evaluation
 
-The suite has 78 questions across simple filtering, aggregation, ranking, time series, multi-condition,
-joins, ambiguous (should clarify), no-result, safety and follow-up questions. Ground truth is hand-written
-SQL run on the pinned data. Scoring compares **results, not SQL text**.
+The suite has 78 questions across simple filtering, aggregation, ranking, time series,
+multi-condition, joins, ambiguous (should clarify), no-result, safety and follow-up questions.
+Ground truth is hand-written SQL run on the pinned data. Scoring compares **results, not SQL text**.
+An offline suite sends 28 adversarial statements through the validator and database without an LLM.
 
 ```bash
 python -m evaluation.run --suite sql-safety                 # offline, no LLM
@@ -188,17 +181,18 @@ questions, one run):
 | Latency avg / median | 2.3 s / 1.9 s |
 
 The four misses are listed in [EVALUATION_PLAN.md](EVALUATION_PLAN.md): one wrong region filter,
-one join returning 4 of 5 rows, and two ambiguous questions that were answered or errored instead of
-clarified. The offline safety suite (28 adversarial statements) last ran 2026-10-04: 28/28
+one join returning 4 of 5 rows, and two ambiguous questions that were answered or errored instead
+of clarified. The offline safety suite (28 adversarial statements) last ran 2026-10-04: 28/28
 blocked. These numbers are one run of one model; they say nothing about other models. The replay
 tests in CI check the evaluation machinery with scripted replies and say nothing about accuracy.
 
 ## Known limitations
 
 - PostgreSQL only; MySQL is not implemented.
-- The rate limiter is in memory per process. Multi-instance or serverless deployments need a shared store
-  (see [Issue #7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7)).
-- Public deployment (Vercel + Neon) is not done yet; deployment guidance is in [docs/deployment.md](docs/deployment.md).
+- The rate limiter is in memory per process. Multi-instance or serverless deployments need a shared
+  store ([#7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7)).
+- No hosted demo yet. [docs/deployment.md](docs/deployment.md) describes a Neon + Vercel + Railway
+  setup; it has not been run end to end.
 - Results depend on the chosen model; only one model has been evaluated so far.
 
 ## Licence and data

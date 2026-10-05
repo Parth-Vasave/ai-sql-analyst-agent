@@ -402,6 +402,22 @@ def test_provider_error_fails_fast_without_repair(shop) -> None:
     assert "sql_repair" not in [e.step for e in result.trace]  # no repair attempt was made
 
 
+def test_empty_provider_reply_is_repaired(shop) -> None:
+    replies = iter([None, reply(VALID_STATUS_SQL)])
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": next(replies)}}]})
+
+    llm = OpenAICompatibleClient(
+        "https://llm.example.test/v1", SecretStr("sk-secret"), "m", transport=httpx.MockTransport(respond)
+    )
+    result = AgentController(llm, max_rows=100).run("How many orders per status?", shop)
+
+    assert result.status == "success" and result.metadata.retry_count == 1
+    generation = next(e for e in result.trace if e.step == "sql_generation")
+    assert generation.status == "failed" and "empty" in generation.detail["error"]
+
+
 # --- result checks feeding the repair loop (Milestone 7) ---------------------------------
 
 

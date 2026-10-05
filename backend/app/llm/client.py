@@ -31,7 +31,7 @@ TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 class LLMError(RuntimeError):
-    """The LLM call failed or returned output that does not match the expected structure."""
+    """The LLM call failed. Unusable output is the LLMOutputError subclass."""
 
 
 class LLMOutputError(LLMError):
@@ -75,7 +75,10 @@ def _describe_validation_error(exc: ValidationError, output: type[BaseModel]) ->
     return ", ".join(problems)
 
 
-def parse_output(content: str, output: type[T]) -> T:
+def parse_output(content: object, output: type[T]) -> T:
+    # Providers can answer 200 with no text at all (a refusal, a tool call): unusable output too.
+    if not isinstance(content, str) or not content.strip():
+        raise LLMOutputError(f"Model reply was empty; expected a {output.__name__} object")
     text = content.strip()
     if text.startswith("```"):  # some models wrap JSON in a Markdown fence despite instructions
         text = text.strip("`").removeprefix("json").strip()
