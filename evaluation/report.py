@@ -88,6 +88,8 @@ def compute(
         "dataset": first.get("dataset", "owid"),
         "scope": first.get("scope"),
         "evidence": first.get("evidence"),
+        "split": ("dev (tuning set, not a reportable result)" if first.get("split") == "dev" else "Mini-Dev")
+        + (f", sample of {first['sample']}" if first.get("sample") else ""),
         "model": first.get("model"),
         "code_commit": first.get("code_commit"),
         "dataset_commit": first.get("dataset_commit"),
@@ -141,7 +143,7 @@ def render(m: dict[str, Any]) -> str:
         f"Run {m['run_id']} ({m['suite']}, {status})",
         f"Model: {m['model']} | answers: {m['answers']}",
         *(
-            [f"Dataset: BIRD Mini-Dev | scope: {m['scope']} | evidence: {m['evidence']}"]
+            [f"Dataset: BIRD {m['split']} | scope: {m['scope']} | evidence: {m['evidence']}"]
             if m["dataset"] == "bird"
             else []
         ),
@@ -228,14 +230,11 @@ def main(argv: list[str] | None = None) -> None:
     review = None
     if first.get("dataset") == "bird":
         review = load_review()
-        # BIRD: the questions with scoreable ground truth, in the databases the run was started for.
-        excluded = bird.load_expected()["excluded"]
+        # BIRD: the questions the run was started for (split, databases, sample), as the runner chose them.
+        split = first.get("split", "test")
         databases = first["databases"].split(",") if first.get("databases") else None
-        planned = [
-            q["id"]
-            for q in bird.load_questions()
-            if q["id"] not in excluded and (databases is None or q["db_id"] in databases)
-        ]
+        expected = bird.load_expected(bird.expected_path(split))
+        planned = [q["id"] for q in bird.items_for(split, expected, databases, first.get("sample"))]
     elif suite == "sql-safety":
         planned = [sid for sid, _ in ADVERSARIAL_SQL]
     else:

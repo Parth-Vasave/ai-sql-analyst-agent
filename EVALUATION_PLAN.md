@@ -167,6 +167,16 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
 * Scoring, beside it: the project's own verdict (above) and set match (BIRD's row-set rule with the
   project's tolerant values: 0.1% relative, numbers as text). They show how many misses are about
   precision, types or column choice rather than the answer.
+* Development set (--split dev): BIRD's other 1,034 dev questions on the same databases (the
+  2025-11-06 revision; `python -m scripts.bird download-dev`). They are for diagnosing misses and
+  tuning, so that the 500 Mini-Dev questions (--split test, the default) are run only to measure a
+  frozen version. Their ground truth is SQLite SQL, translated to PostgreSQL by build-expected
+  --split dev (sqlglot, plus identifier spelling, LIKE as ILIKE, ROUND on numeric) and kept only if
+  it runs: 961 kept, 73 excluded (mostly SQLite's loose typing, e.g. text compared with numbers).
+  Excluded questions are counted, never fixed by hand; translated ground truth can still differ
+  from SQLite in ways that do not raise an error, so dev numbers are a guide, not a result.
+  --sample N runs a fixed sample stratified by database and difficulty. The dev questions are
+  easier than Mini-Dev (69% simple against 30%), so dev accuracy is likely to run higher than test accuracy.
 * Ground-truth errors: BIRD's annotations contain mistakes. evaluation/bird_review.json lists the
   questions reviewed so far, with a verdict (ground_truth_error, ground_truth_questionable,
   ambiguous) and a note; every ground_truth_error was confirmed by running a corrected query. The
@@ -177,6 +187,7 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
     python -m evaluation.run --dataset bird --databases formula_1,california_schools --delay 45 \
         --daily-tokens 200000
     python -m evaluation.run --dataset bird --scope all --evidence off
+    python -m evaluation.run --dataset bird --split dev --sample 300 --daily-tokens 200000
     python -m evaluation.report evaluation/results/<id>.jsonl
 
 Token budget: per-database schemas are 0.2k–3.2k tokens. In `all` scope the keyword retriever sends a

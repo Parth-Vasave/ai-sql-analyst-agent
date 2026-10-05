@@ -7,7 +7,12 @@ one `public` schema; `load` moves each BIRD database's tables into a schema of i
 
 Usage:
     python -m scripts.bird download     # pinned files, SHA-256 verified, into data/raw/bird/
+    python -m scripts.bird download-dev # BIRD's full dev questions (the development set, ~1 MB)
     ADMIN_DATABASE_URL=postgresql://... python -m scripts.bird load [--replace]
+
+The development set is BIRD's dev questions (revision of 2025-11-06) on the same 11 databases,
+minus the 500 Mini-Dev ones: questions to tune on without touching the test questions (see
+evaluation/bird.py). Its ground truth is SQLite SQL, translated when the expected results are built.
 
 `load` runs as the database OWNER (ADMIN_DATABASE_URL, any database on the server), never as
 sql_agent: it creates the database `bird` next to it, loads the dump with psql, and grants the
@@ -57,6 +62,14 @@ QUESTIONS_URL = (
 )
 QUESTIONS_SHA256 = "7fa740ef9225389cff6c34432120e8325d0ca3008d73db1ae38731234bc10da7"
 QUESTIONS_FILE = "mini_dev_pg.json"
+# BIRD's full dev set (1,534 questions, SQLite SQL), as revised by the BIRD team on 2025-11-06.
+DEV_QUESTIONS_REVISION = "3c11fb193e5439b338e23677fa0aae11e8b85db9"
+DEV_QUESTIONS_URL = (
+    f"https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106/resolve/{DEV_QUESTIONS_REVISION}"
+    "/data/dev_20251106-00000-of-00001.json"
+)
+DEV_QUESTIONS_SHA256 = "ffd8018378ddb1a8794753e0a31cfc81862ff7318a5184c22f3dc4ce03a03feb"
+DEV_QUESTIONS_FILE = "dev_20251106.json"
 
 _OWNER = re.compile(r"^ALTER \S+ .* OWNER TO \S+;$")
 _COPY_START = re.compile(r"^COPY \S+ \(.*\) FROM stdin;$")
@@ -114,6 +127,25 @@ def download(raw_dir: Path = RAW_DIR, verify: bool = True, keep_package: bool = 
         "questions": {"url": QUESTIONS_URL, "revision": QUESTIONS_REVISION, "sha256": questions_digest},
     }
     (raw_dir / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
+def download_dev(raw_dir: Path = RAW_DIR, verify: bool = True) -> dict:
+    """The full dev questions only (the databases are Mini-Dev's); recorded in the manifest."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    digest = _download_file(DEV_QUESTIONS_URL, raw_dir / DEV_QUESTIONS_FILE, DEV_QUESTIONS_SHA256, verify)
+    manifest_path = raw_dir / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+    manifest["dev_questions"] = {
+        "source": "BIRD dev, revised 2025-11-06 (https://huggingface.co/datasets/birdsql/bird_sql_dev_20251106)",
+        "license": "CC BY-SA 4.0",
+        "url": DEV_QUESTIONS_URL,
+        "revision": DEV_QUESTIONS_REVISION,
+        "sha256": digest,
+        "downloaded_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+        "verified_against_pinned_hashes": verify,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
 
 
@@ -236,9 +268,11 @@ def main(argv: list[str] | None = None) -> int:
     get = commands.add_parser("download", help="download the pinned BIRD Mini-Dev files")
     get.add_argument("--no-verify", action="store_true", help="skip the pinned SHA-256 checks")
     get.add_argument("--keep-package", action="store_true", help="keep the 800 MB zip after extraction")
+    get_dev = commands.add_parser("download-dev", help="download BIRD's full dev questions (development set)")
+    get_dev.add_argument("--no-verify", action="store_true", help="skip the pinned SHA-256 check")
     put = commands.add_parser("load", help="load them into the database 'bird' (ADMIN_DATABASE_URL)")
     put.add_argument("--replace", action="store_true", help="drop and reload an existing 'bird' database")
-    for sub in (get, put):
+    for sub in (get, get_dev, put):
         sub.add_argument("--raw-dir", type=Path, default=RAW_DIR)
     args = parser.parse_args(argv)
 
@@ -246,6 +280,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "download":
             download(args.raw_dir, verify=not args.no_verify, keep_package=args.keep_package)
             print(f"Wrote the BIRD Mini-Dev files and {MANIFEST_NAME} to {args.raw_dir}")
+        elif args.command == "download-dev":
+            download_dev(args.raw_dir, verify=not args.no_verify)
+            print(f"Wrote {DEV_QUESTIONS_FILE} to {args.raw_dir} and added it to {MANIFEST_NAME}")
         else:
             admin_url = os.environ.get("ADMIN_DATABASE_URL")
             if not admin_url:

@@ -9,6 +9,8 @@
     # BIRD Mini-Dev (load it first, see evaluation/bird.py): per BIRD database, or all 75 tables
     python -m evaluation.run --dataset bird --databases formula_1,financial --delay 5
     python -m evaluation.run --dataset bird --scope all --evidence off
+    # BIRD's other dev questions, for tuning: a fixed sample stratified by database and difficulty
+    python -m evaluation.run --dataset bird --split dev --sample 300 --daily-tokens 200000
     # metrics
     python -m evaluation.report evaluation/results/<run-id>.jsonl
 
@@ -398,6 +400,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--evidence", choices=["on", "off"], default="on",
                         help="bird: append BIRD's hint (its 'evidence') to each question")  # fmt: skip
+    parser.add_argument("--split", choices=["test", "dev"], default="test",
+                        help="bird: test = Mini-Dev (reported); dev = other dev questions")  # fmt: skip
+    parser.add_argument("--sample", type=int,
+                        help="bird: a fixed sample of N, stratified by database and difficulty")  # fmt: skip
     parser.add_argument(
         "--max-rows", type=int, help=f"the agent's row cap (default: MAX_ROWS; bird: {bird.BIRD_MAX_ROWS:,})"
     )
@@ -418,6 +424,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.dataset == "bird" and args.suite != "questions":
         print("The sql-safety suite runs on the OWID database only.", file=sys.stderr)
         return 2
+    if args.dataset != "bird" and (args.split != "test" or args.sample):
+        print("--split and --sample apply to --dataset bird only.", file=sys.stderr)
+        return 2
 
     default_rows = bird.BIRD_MAX_ROWS if args.dataset == "bird" else settings.max_rows
     max_rows = args.max_rows or default_rows
@@ -427,12 +436,14 @@ def main(argv: list[str] | None = None) -> int:
         resume += f" --max-rows {max_rows}"
     if args.dataset == "bird":
         url = bird.bird_url(settings.database_url)
-        expected_doc = bird.load_expected()
-        questions = bird.load_questions()
-        connections = bird.connect(
-            url, args.scope, bird.database_ids(questions), settings.query_timeout_seconds
-        )
-        items = [q for q in questions if q["id"] not in expected_doc["excluded"]]
+        expected_doc = bird.load_expected(bird.expected_path(args.split))
+        all_dbs = bird.database_ids(bird.load_questions())
+        connections = bird.connect(url, args.scope, all_dbs, settings.query_timeout_seconds)
+        wanted_dbs = args.databases.split(",") if args.databases else None
+        if unknown := set(wanted_dbs or []) - set(connections):
+            print(f"Unknown BIRD databases: {sorted(unknown)}", file=sys.stderr)
+            return 2
+        items = bird.items_for(args.split, expected_doc, wanted_dbs, args.sample)
         if expected_doc["excluded"]:
             print(
                 f"{len(expected_doc['excluded'])} questions have no scoreable ground truth (build-expected)."
@@ -440,18 +451,20 @@ def main(argv: list[str] | None = None) -> int:
         if expected_doc.get("max_rows", 0) < max_rows:
             print(f"Ground truth was built with a {expected_doc.get('max_rows')}-row cap: rebuild it with "
                   "`python -m evaluation.bird build-expected` to score larger results.")  # fmt: skip
-        if args.databases:
-            wanted_dbs = args.databases.split(",")
-            if unknown := set(wanted_dbs) - set(connections):
-                print(f"Unknown BIRD databases: {sorted(unknown)}", file=sys.stderr)
-                return 2
-            items = [i for i in items if i["db_id"] in wanted_dbs]
         integrity: Callable[[], dict[str, int]] = lambda: bird.fingerprint(url)  # noqa: E731
         commit = expected_doc.get("questions_revision")
-        meta.update(scope=args.scope, evidence=args.evidence, databases=args.databases)
-        resume += f" --dataset bird --scope {args.scope} --evidence {args.evidence}"
+        meta.update(
+            scope=args.scope,
+            evidence=args.evidence,
+            databases=args.databases,
+            split=args.split,
+            sample=args.sample,
+        )
+        resume += f" --dataset bird --split {args.split} --scope {args.scope} --evidence {args.evidence}"
         if args.databases:
             resume += f" --databases {args.databases}"
+        if args.sample:
+            resume += f" --sample {args.sample}"
     else:
         connection = ConnectionRegistry(settings.query_timeout_seconds).add(
             ConnectionConfig(id="owid", name="OWID", url=settings.database_url)
@@ -465,7 +478,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    default_id = f"{stamp}-{args.suite}" if args.dataset == "owid" else f"{stamp}-bird-{args.scope}"
+    split = "-dev" if args.split == "dev" else ""
+    default_id = f"{stamp}-{args.suite}" if args.dataset == "owid" else f"{stamp}-bird{split}-{args.scope}"
     if args.dataset == "bird" and args.evidence == "off":
         default_id += "-noevidence"
     run_id = args.run_id or default_id
@@ -476,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.run_id:
         first = next(iter(load_records(path).values()), {})
         # Runs from before a setting was recorded used its default then.
-        defaults = {"dataset": "owid", "max_rows": settings.max_rows}
+        defaults = {"dataset": "owid", "max_rows": settings.max_rows, "split": "test"}
         settings_then = {k: first.get(k, defaults.get(k)) for k in meta}
         if settings_then != meta:
             print(f"Run {run_id} was started with {settings_then}; resume it with the same options.",

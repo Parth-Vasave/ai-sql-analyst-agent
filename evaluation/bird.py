@@ -20,13 +20,21 @@ ground-truth SQL again and comparing the raw rows. Evaluation runs raise the age
 BIRD_MAX_ROWS so that no ground truth has to be excluded for its size; the app's MAX_ROWS is
 unchanged.
 
+Two splits (--split): `test` is Mini-Dev, the reported number, run once per frozen version; `dev`
+is BIRD's other dev questions on the same databases (`python -m scripts.bird download-dev`), for
+diagnosing and tuning. Dev ground truth is SQLite SQL: build-expected translates it to PostgreSQL
+(`translate_sqlite`), runs it, and keeps it only if it executes; the rest are excluded and counted,
+never hand-edited. `--sample N` runs a fixed, stratified sample (by database and difficulty).
+
 The questions and results are CC BY-SA 4.0 and are not committed: they live under data/.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+from collections import defaultdict
 from collections.abc import Callable, Hashable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -34,12 +42,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 import psycopg
+import sqlglot
 from psycopg import sql
 from pydantic import SecretStr
 from sqlalchemy.engine import make_url
+from sqlglot import exp
+
+from app.agent.controller import AgentResult
 
 # The conversion the agent's own results go through, so expected and actual values compare alike.
-from app.agent.controller import AgentResult
 from app.agent.executor import _json_safe
 from app.config import get_settings
 from app.database.connections import ConnectionConfig, ConnectionRegistry, DatabaseConnection
@@ -47,8 +58,10 @@ from evaluation import ROOT
 
 RAW_DIR = ROOT / "data" / "raw" / "bird"
 QUESTIONS = RAW_DIR / "mini_dev_pg.json"
+DEV_QUESTIONS = RAW_DIR / "dev_20251106.json"
 MANIFEST = RAW_DIR / "bird.manifest.json"
 EXPECTED = ROOT / "data" / "processed" / "bird" / "expected.json"
+EXPECTED_DEV = ROOT / "data" / "processed" / "bird" / "expected_dev.json"
 DATABASE = "bird"
 GROUND_TRUTH_TIMEOUT_SECONDS = 60
 # The agent's row cap in evaluation runs, and the largest ground truth kept. The app's default of
@@ -64,15 +77,17 @@ SCORING_OPTIONS = (
 )
 
 Scope = Literal["database", "all"]
+Split = Literal["test", "dev"]
 
 
-def load_questions(path: Path = QUESTIONS) -> list[dict[str, Any]]:
+def load_questions(path: Path = QUESTIONS, prefix: str = "B") -> list[dict[str, Any]]:
     """BIRD questions in the shape of evaluation/questions.json, plus db_id and evidence."""
     if not path.exists():
-        raise SystemExit(f"{path} not found. Run `python -m scripts.bird download` first.")
+        command = "download-dev" if path == DEV_QUESTIONS else "download"
+        raise SystemExit(f"{path} not found. Run `python -m scripts.bird {command}` first.")
     return [
         {
-            "id": f"B{q['question_id']:04d}",
+            "id": f"{prefix}{q['question_id']:04d}",
             "category": q["difficulty"],
             "db_id": q["db_id"],
             "question": q["question"],
@@ -83,6 +98,93 @@ def load_questions(path: Path = QUESTIONS) -> list[dict[str, Any]]:
         }
         for q in json.loads(path.read_text())
     ]
+
+
+def load_dev_questions(path: Path = DEV_QUESTIONS, test_path: Path = QUESTIONS) -> list[dict[str, Any]]:
+    """BIRD dev questions that are not in Mini-Dev (ids "D0123"; BIRD's question ids are shared, so
+    a Mini-Dev question is left out even where the dev revision reworded it). Their ground truth is
+    BIRD's SQLite SQL, translated by build-expected."""
+    test_ids = {q["id"][1:] for q in load_questions(test_path)}
+    return [q for q in load_questions(path, prefix="D") if q["id"][1:] not in test_ids]
+
+
+def stratified_sample(items: list[dict[str, Any]], size: int) -> list[dict[str, Any]]:
+    """A fixed sample of `size` items with the same mix of databases and difficulties as `items`:
+    each (database, difficulty) group gets its proportional share (largest remainders first), and
+    within a group the items whose ids hash lowest are taken. Same input, same sample."""
+    if size >= len(items):
+        return list(items)
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for item in items:
+        groups[(item["db_id"], item["category"])].append(item)
+    exact = {key: size * len(group) / len(items) for key, group in groups.items()}
+    quota = {key: int(share) for key, share in exact.items()}
+    by_remainder = sorted(groups, key=lambda key: (quota[key] - exact[key], key))
+    for key in by_remainder[: size - sum(quota.values())]:
+        quota[key] += 1
+    chosen = {
+        item["id"]
+        for key, group in groups.items()
+        for item in sorted(group, key=lambda i: hashlib.sha256(i["id"].encode()).hexdigest())[: quota[key]]
+    }
+    return [item for item in items if item["id"] in chosen]
+
+
+def translate_sqlite(query: str, names: dict[str, str]) -> str:
+    """BIRD's SQLite ground truth as PostgreSQL that means the same, as far as can be done
+    mechanically. `names` maps lower-case table and column names to their PostgreSQL spelling.
+
+    sqlglot does the dialect translation (including SQLite's NULL ordering). On top of it:
+    identifiers are spelled as in the PostgreSQL schema (SQLite ignores case, PostgreSQL folds
+    unquoted names to lower case); LIKE becomes ILIKE (SQLite's LIKE ignores ASCII case); ROUND
+    with decimals rounds a numeric (PostgreSQL has no round(double precision, int)). Whatever still
+    fails to run is excluded by build-expected, never fixed by hand."""
+    tree = sqlglot.parse_one(query, read="sqlite")
+    for identifier in list(tree.find_all(exp.Identifier)):
+        actual = names.get(identifier.this.lower())
+        if actual is not None:
+            plain = actual == actual.lower() and actual.replace("_", "").isalnum()
+            identifier.set("this", actual)
+            identifier.set("quoted", bool(identifier.args.get("quoted")) or not plain)
+    for like in list(tree.find_all(exp.Like)):
+        like.replace(exp.ILike(this=like.this, expression=like.expression))
+    for rounding in list(tree.find_all(exp.Round)):
+        if rounding.args.get("decimals") is not None:
+            rounding.set("this", exp.Cast(this=rounding.this, to=exp.DataType.build("numeric")))
+    return tree.sql(dialect="postgres")
+
+
+def schema_names(conn: psycopg.Connection) -> dict[str, dict[str, str]]:
+    """BIRD database id -> {lower-case table or column name: its PostgreSQL spelling}."""
+    names: dict[str, dict[str, str]] = defaultdict(dict)
+    rows = conn.execute(
+        "SELECT table_schema, table_name, column_name FROM information_schema.columns"
+        " WHERE table_schema NOT IN ('pg_catalog', 'information_schema')"
+    ).fetchall()
+    for schema, table, column in rows:
+        names[schema][table.lower()] = table
+        names[schema][column.lower()] = column
+    return names
+
+
+def items_for(
+    split: Split, expected_doc: dict[str, Any], databases: list[str] | None = None, sample: int | None = None
+) -> list[dict[str, Any]]:
+    """The questions a run asks (and a report plans for): scoreable ones of the split, in the given
+    BIRD databases, sampled when asked. Dev questions carry their translated ground truth."""
+    if split == "dev":
+        translated = expected_doc.get("ground_truth_sql", {})
+        items = [
+            {**q, "ground_truth": {**q["ground_truth"], "sql": translated[q["id"]]}}
+            for q in load_dev_questions()
+            if q["id"] in translated
+        ]
+    else:
+        items = load_questions()
+    items = [q for q in items if q["id"] not in expected_doc["excluded"]]
+    if databases:
+        items = [q for q in items if q["db_id"] in databases]
+    return stratified_sample(items, sample) if sample else items
 
 
 def question_text(item: dict[str, Any], evidence: bool) -> str:
@@ -160,16 +262,28 @@ def only_nulls(rows: list[list[Any]]) -> bool:
     return bool(rows) and all(value is None for row in rows for value in row)
 
 
-def build_expected(url: SecretStr, max_rows: int, show: bool = False) -> dict[str, Any]:
-    questions = load_questions()
+def build_expected(
+    url: SecretStr, max_rows: int, show: bool = False, split: Split = "test"
+) -> dict[str, Any]:
+    questions = load_dev_questions() if split == "dev" else load_questions()
     results: dict[str, list[dict[str, Any]]] = {}
     excluded: dict[str, str] = {}
     warnings: dict[str, str] = {}
+    translated: dict[str, str] = {}
     with psycopg.connect(_libpq(url), options=SCORING_OPTIONS) as conn:
+        names = schema_names(conn) if split == "dev" else {}
         for item in questions:
-            outcome = run_ground_truth(conn, item["db_id"], item["ground_truth"]["sql"], max_rows)
+            query = item["ground_truth"]["sql"]
+            if split == "dev":
+                try:
+                    query = translated[item["id"]] = translate_sqlite(query, names[item["db_id"]])
+                except sqlglot.errors.SqlglotError as exc:
+                    excluded[item["id"]] = f"translation failed: {_first_line(exc)}"
+                    continue
+            outcome = run_ground_truth(conn, item["db_id"], query, max_rows)
             if "error" in outcome:
                 excluded[item["id"]] = outcome["error"]
+                translated.pop(item["id"], None)
             else:
                 results[item["id"]] = [outcome]
                 if only_nulls(outcome["rows"]):
@@ -178,15 +292,19 @@ def build_expected(url: SecretStr, max_rows: int, show: bool = False) -> dict[st
             if show:
                 print(f"{item['id']} [{item['db_id']}] {item['question']}\n    {outcome}")
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
+    source = manifest.get("dev_questions" if split == "dev" else "questions", {})
     return {
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "dataset": "bird-mini-dev",
-        "questions_revision": manifest.get("questions", {}).get("revision"),
+        "dataset": "bird-dev" if split == "dev" else "bird-mini-dev",
+        "split": split,
+        "questions_revision": source.get("revision"),
         "max_rows": max_rows,
         "row_counts": fingerprint(url),
         "results": results,
         "excluded": excluded,  # question id -> why its ground truth cannot be scored
         "warnings": warnings,  # question id -> why its ground truth looks wrong (still scored)
+        # dev only: the translated PostgreSQL of each scoreable question
+        **({"ground_truth_sql": translated} if split == "dev" else {}),
     }
 
 
@@ -268,9 +386,14 @@ def _first_line(exc: Exception) -> str:
     return str(exc).strip().splitlines()[0][:300] if str(exc).strip() else exc.__class__.__name__
 
 
+def expected_path(split: Split) -> Path:
+    return EXPECTED_DEV if split == "dev" else EXPECTED
+
+
 def load_expected(path: Path = EXPECTED) -> dict[str, Any]:
     if not path.exists():
-        raise SystemExit(f"{path} not found. Run `python -m evaluation.bird build-expected` first.")
+        split = " --split dev" if path == EXPECTED_DEV else ""
+        raise SystemExit(f"{path} not found. Run `python -m evaluation.bird build-expected{split}` first.")
     return json.loads(path.read_text())
 
 
@@ -283,17 +406,26 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--show", action="store_true", help="print every expected result")
     build.add_argument("--max-rows", type=int, default=BIRD_MAX_ROWS,
                        help=f"larger ground truths are excluded (default {BIRD_MAX_ROWS:,})")  # fmt: skip
+    build.add_argument("--split", choices=["test", "dev"], default="test",
+                       help="test: Mini-Dev (default); dev: the other dev questions")  # fmt: skip
     args = parser.parse_args(argv)
 
     settings = get_settings()
     if settings.database_url is None:
         raise SystemExit("Set DATABASE_URL to the read-only sql_agent account (its server has `bird`).")
-    document = build_expected(bird_url(settings.database_url), args.max_rows, show=args.show)
-    EXPECTED.parent.mkdir(parents=True, exist_ok=True)
-    EXPECTED.write_text(json.dumps(document, indent=1, default=str) + "\n")
-    print(f"Wrote {len(document['results'])} expected results to {EXPECTED.relative_to(ROOT)}")
+    document = build_expected(
+        bird_url(settings.database_url), args.max_rows, show=args.show, split=args.split
+    )
+    target = expected_path(args.split)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(document, indent=1, default=str) + "\n")
+    print(f"Wrote {len(document['results'])} expected results to {target.relative_to(ROOT)}")
     for qid, reason in sorted(document["excluded"].items()):
         print(f"  excluded {qid}: {reason}")
+    if args.split == "dev" and document["excluded"]:
+        total = len(document["results"]) + len(document["excluded"])
+        print(f"{len(document['excluded'])} of {total} dev questions excluded: their SQLite ground truth "
+              "does not run on PostgreSQL as translated")  # fmt: skip
     for qid, reason in sorted(document["warnings"].items()):
         print(f"  suspect {qid}: {reason}")
     return 0

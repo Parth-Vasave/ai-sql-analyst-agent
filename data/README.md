@@ -96,11 +96,14 @@ Interface? A BIg Bench for Large-Scale Database Grounded Text-to-SQLs" (BIRD), N
 |---|---|
 | Database dump | `BIRD_dev.sql` and `dev_tables.json` from the Mini-Dev package (`minidev_0703.zip`, SHA-256 `aeb211c0e39010bbdae3838bb5e8bd27dc446ed77495b1709f85ccc9bf67f2be`) |
 | Questions | Hugging Face `birdsql/bird_mini_dev` revision `f65faf4`, `mini_dev_pg` (SHA-256 `7fa740ef9225389cff6c34432120e8325d0ca3008d73db1ae38731234bc10da7`); newer than the package's copy, with one ground-truth fix |
+| Development questions (optional) | Hugging Face `birdsql/bird_sql_dev_20251106` revision `3c11fb1`, BIRD's full dev set as revised on 2025-11-06 (1,534 questions, SQLite SQL; SHA-256 `ffd8018378ddb1a8794753e0a31cfc81862ff7318a5184c22f3dc4ce03a03feb`). The 1,034 that are not Mini-Dev questions are the tuning set; same databases, so nothing more to load |
 
 ```bash
 python -m scripts.bird download                            # ~800 MB download, keeps ~1 GB in data/raw/bird/
 ADMIN_DATABASE_URL=postgresql://... python -m scripts.bird load   # needs psql; about 30 s
 python -m evaluation.bird build-expected                   # ground truth into data/processed/bird/
+python -m scripts.bird download-dev                        # optional: development questions, ~1 MB
+python -m evaluation.bird build-expected --split dev       # their ground truth, translated from SQLite
 ```
 
 With Docker: `docker compose run --rm seed python -m scripts.bird download`, then the same with
