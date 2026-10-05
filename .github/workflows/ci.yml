@@ -96,6 +96,20 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Disposable MySQL for the MySQL/MariaDB adapter integration tests. MariaDB shares the
+      # adapter and dialect; its max_statement_time path is covered by an offline unit test and
+      # was verified against MariaDB 13 locally.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -125,6 +139,8 @@ jobs:
           {
             echo "TEST_ADMIN_DATABASE_URL=postgresql://emissions_owner:${owner_password}@localhost:5432/emissions_test"
             echo "TEST_SQL_AGENT_PASSWORD=${agent_password}"
+            echo "TEST_MYSQL_ADMIN_URL=mysql://root:root@127.0.0.1:3306/"
+            echo "TEST_MYSQL_AGENT_PASSWORD=${agent_password}"
           } >> "$GITHUB_ENV"
 
       # The integration tests skip themselves when the database variables are missing. Fail on
