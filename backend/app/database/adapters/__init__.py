@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 from app.database.adapters.base import DatabaseAdapter, ErrorCategory, PrivilegeReport
+from app.database.adapters.mysql import MysqlAdapter
 from app.database.adapters.postgres import PostgresAdapter
 
-_ADAPTERS: dict[str, type[DatabaseAdapter]] = {"postgresql": PostgresAdapter}
+# MariaDB speaks the same protocol and dialect as MySQL, so both backend names share one adapter.
+_ADAPTERS: dict[str, type[DatabaseAdapter]] = {
+    "postgresql": PostgresAdapter,
+    "mysql": MysqlAdapter,
+    "mariadb": MysqlAdapter,
+}
 
 SUPPORTED_BACKENDS = tuple(sorted(_ADAPTERS))
 
