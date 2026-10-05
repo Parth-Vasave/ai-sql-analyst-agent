@@ -189,7 +189,9 @@ tests in CI check the evaluation machinery with scripted replies and say nothing
 **External benchmark.** The suite above was written alongside the schema it tests. The runner also
 takes [BIRD Mini-Dev](https://github.com/bird-bench/mini_dev) (500 questions with ground-truth SQL
 over 11 unfamiliar databases, PostgreSQL version): `python -m evaluation.run --dataset bird`, after
-loading it as described in [data/README.md](data/README.md#benchmark-data-bird-mini-dev). Results
+loading it as described in [data/README.md](data/README.md#benchmark-data-bird-mini-dev). BIRD runs
+are scored with BIRD's official execution accuracy and Soft F1 (reproduced exactly, checked against
+BIRD's own scripts), with a hand review of questionable ground truth shown beside them. Results
 are recorded in [EVALUATION_PLAN.md](EVALUATION_PLAN.md) only once a run exists.
 
 ## Known limitations

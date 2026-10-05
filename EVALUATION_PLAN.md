@@ -86,11 +86,16 @@ Metrics (python -m evaluation.report)
 * Result correctness (query questions)
 * Empty-result accuracy, clarification accuracy
 * Refusal rate (safety questions), adversarial SQL blocked (offline suite)
-* Set match (BIRD's execution accuracy, query questions; see BIRD Mini-Dev below), and per
-  BIRD database
+* BIRD runs: BIRD's official execution accuracy (EX) and Soft F1, overall, per BIRD database and
+  per difficulty; set match (BIRD's row-set rule with tolerant values); the hand review beside
+  them (see BIRD Mini-Dev below)
 * Retry rate (questions that needed a repair), timeout rate
 * Safety violations
-* Average and median latency
+* Average and median latency; tokens and LLM calls per question (from the provider's counts)
+
+Each record also keeps the agent's explanation, clarification question and plan (structured
+artifacts, never chain-of-thought), the result checks that fired and every failed step, so a miss
+can be diagnosed from the results file alone.
 
 ⸻
 
@@ -118,7 +123,12 @@ never report their numbers as evaluation results.
 LLM budget: each question takes one call for the SQL plus up to two repairs, plus one for the
 answer with --answers llm (the default, template, needs none). On the free Gemini tier (about 5
 requests per minute and 20 per day per model) the question suite has to be run in daily batches
-with the same --run-id; the runner stops by itself after three provider failures in a row.
+with the same --run-id. Before a run the runner prints the expected token use, from tokens per
+question measured in earlier runs of the same model, dataset and answer mode (never assumed), and
+compares it with --daily-tokens when given (Groq's daily token limit is not in its response
+headers). Provider failures are handled by kind: a per-minute limit is waited out when the
+provider asks for at most two minutes and the question asked again; a used-up daily or account
+quota stops the run at once and says when to resume; other failures stop it after three in a row.
 
 ⸻
 
@@ -134,25 +144,38 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
   load` (database `bird` next to the OWID one, one schema per BIRD database, SELECT granted to
   sql_agent). See data/README.md. Nothing from BIRD is committed.
 * Ground truth: `python -m evaluation.bird build-expected` runs BIRD's SQL (the PostgreSQL version,
-  Hugging Face revision f65faf4) on the read-only account. All 500 run; 13 return more than
-  MAX_ROWS (1,000) rows, which the agent's result would cut off, so they are excluded: 487 scoreable.
+  Hugging Face revision f65faf4) on the read-only account. All 500 run and all 500 are scored:
+  BIRD runs raise the agent's row cap to 50,000 (--max-rows; the app's MAX_ROWS is unchanged), and
+  the largest ground truth has 29,936 rows. At the app's 1,000 rows, 13 had to be excluded. Two
+  ground truths return only NULL (B0944, B1526); they are flagged, not excluded, because BIRD
+  scores them.
 * Scope (--scope): `database` (BIRD's setting: the agent sees one BIRD database) or `all` (one
   connection over all 75 tables, so schema retrieval has to find the right ones).
 * Evidence (--evidence): BIRD gives each question a hint ("evidence"), e.g. "eligible free rate =
   Free Meal Count / Enrollment". `on` appends it to the question as "Hint: ..."; `off` measures
   the agent without it. Published BIRD scores are usually with evidence.
-* Scoring: every question gets both the project's own verdict (above) and BIRD's execution
-  accuracy, reported as "Set match": the same columns in the same order and the same set of rows
-  (row order and duplicates ignored). They differ: 29 ground-truth results contain duplicate rows,
-  which the project's scorer requires and set match ignores; set match rejects extra columns, which
-  the project's scorer allows. Neither is identical to BIRD's official script, so compare with
-  published numbers only loosely.
-* Ground-truth errors: BIRD's annotations contain mistakes. Every wrong answer is checked by hand
-  before a run is recorded, and misses caused by the ground truth are listed as such (they still
-  count as wrong in the metrics). Example: B0847 asks for the driver with the best Q2 time in race
-  19; the ground truth sorts `q2 ASC NULLS FIRST` and so returns one of the drivers with no Q2 time.
+* Scoring, headline: BIRD's official execution accuracy (EX) and Mini-Dev's Soft F1, computed as
+  BIRD's evaluation scripts compute them: the agent's final SQL and the ground-truth SQL are run
+  again and their raw rows compared (EX: the same set of rows, values exactly as the driver
+  returns them; Soft F1: partial credit per value). The two functions were checked against BIRD's
+  own on 200,000 random results. This is the only number to compare with published results.
+  Exact means exact: a `numeric` 94.037 is not the `float` 94.037, and the text '202.484' is not the
+  number 202.484, as in BIRD's own evaluation.
+* Determinism: scoring sessions (and build-expected) run without parallel query. With parallel
+  workers PostgreSQL adds floats in a different order on each run, and BIRD's own SQL for B1482
+  returned 15 different values in 15 runs; without them, the same value every time.
+* Scoring, beside it: the project's own verdict (above) and set match (BIRD's row-set rule with the
+  project's tolerant values: 0.1% relative, numbers as text). They show how many misses are about
+  precision, types or column choice rather than the answer.
+* Ground-truth errors: BIRD's annotations contain mistakes. evaluation/bird_review.json lists the
+  questions reviewed so far, with a verdict (ground_truth_error, ground_truth_questionable,
+  ambiguous) and a note; every ground_truth_error was confirmed by running a corrected query. The
+  report shows EX on flagged and unflagged questions beside the official score, never instead of it.
+  Example: B0847 asks for the driver with the best Q2 time in race 19; the ground truth sorts
+  `q2 ASC NULLS FIRST` and so returns one of the six drivers with no Q2 time.
 
-    python -m evaluation.run --dataset bird --databases formula_1,california_schools --delay 45
+    python -m evaluation.run --dataset bird --databases formula_1,california_schools --delay 45 \
+        --daily-tokens 200000
     python -m evaluation.run --dataset bird --scope all --evidence off
     python -m evaluation.report evaluation/results/<id>.jsonl
 
@@ -165,6 +188,27 @@ tokens per minute allows in one request: `all` scope needs a larger quota.
 Evaluation History
 
 Record every run here with its report. Never add numbers that were not produced by a run.
+
+2026-10-05 — BIRD Mini-Dev, PARTIAL (run 20261005-103021-bird-database) — not comparable
+Commit: 2dbb325 (working tree had uncommitted changes) | Dataset: BIRD Mini-Dev PostgreSQL f65faf4 |
+Model: openai/gpt-oss-120b (Groq) | scope: database | evidence: on | answers: template | row cap 1,000
+Results: evaluation/results/20261005-103021-bird-database.jsonl (local; BIRD-derived results are
+not committed until the licence question is decided)
+* Planned: formula_1, california_schools, thrombosis_prediction (142 questions at the time; 13 of
+  the 500 were excluded by the 1,000-row cap). Scored: 96 (46 formula_1, 50 thrombosis_prediction);
+  5 not run (HTTP 429), california_schools never reached: Groq's 200,000 tokens/day limit
+* Official EX 36/96 (37.5%); Soft F1 43.7%. formula_1 18/46, thrombosis_prediction 18/50; simple
+  13/29, moderate 17/46, challenging 6/21. Computed afterwards (Phase 0 of
+  docs/bird-improvement-plan.md) by running the recorded SQL again with the official scorer
+* At the time of the run: project scorer 48/96 (50%), set match 43/96 (45%). Seven answers that
+  set match accepts fail EX: four on numeric vs float type, one a number given as text, one
+  rounded, one within 0.1%
+* Hand review: 30 of the 60 EX misses are on questions in evaluation/bird_review.json (18 ground-truth
+  errors, 8 questionable, 4 ambiguous); EX on the 66 unflagged questions 36/66 (55%). Judgement,
+  shown beside the official number and never instead of it
+* Not comparable with any leaderboard: 2 of 11 databases, 96 of 500 questions, one run. Pipeline
+  issues found (no reasons recorded, daily quota misread as a per-minute limit, no token
+  estimate) were fixed in Phase 0
 
 2026-10-04 — question suite, complete (run 20261004-061307-questions)
 Commit: 5145243 (working tree had uncommitted changes) | Dataset: OWID 382ee6c | Model: openai/gpt-oss-120b (Groq) | answers: template
