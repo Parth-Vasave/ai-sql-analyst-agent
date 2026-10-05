@@ -31,7 +31,17 @@ TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 class LLMError(RuntimeError):
-    """The LLM call failed or returned output that does not match the expected structure."""
+    """The LLM call failed. Unusable output is the LLMOutputError subclass."""
+
+
+class LLMOutputError(LLMError):
+    """The provider replied, but the reply is not the structured output we asked for.
+
+    This is a model-output failure, not a provider failure: it is worth one more try with a
+    short description of what was wrong. Its message is derived only from safe metadata (the
+    error type and the field names the expected model declares); the raw reply is never quoted,
+    because it is untrusted text.
+    """
 
 
 @dataclass(frozen=True)
@@ -51,14 +61,37 @@ class LLMClient(Protocol):
     def complete_json(self, system: str, user: str, output: type[T]) -> tuple[T, LLMCall]: ...
 
 
-def parse_output(content: str, output: type[T]) -> T:
+def _describe_validation_error(exc: ValidationError, output: type[BaseModel]) -> str:
+    """A safe summary of a schema mismatch, built only from trusted information.
+
+    The reply is untrusted, so only field names declared by `output` and pydantic's own error
+    types are reported; the model's keys, values and messages are never included.
+    """
+    fields = set(output.model_fields)
+    problems = []
+    for error in exc.errors()[:10]:
+        location = [part for part in error.get("loc", ()) if isinstance(part, str) and part in fields]
+        problems.append(f"{'.'.join(location) or 'reply'} ({error.get('type', 'invalid')})")
+    return ", ".join(problems)
+
+
+def parse_output(content: object, output: type[T]) -> T:
+    # Providers can answer 200 with no text at all (a refusal, a tool call): unusable output too.
+    if not isinstance(content, str) or not content.strip():
+        raise LLMOutputError(f"Model reply was empty; expected a {output.__name__} object")
     text = content.strip()
     if text.startswith("```"):  # some models wrap JSON in a Markdown fence despite instructions
         text = text.strip("`").removeprefix("json").strip()
     try:
-        return output.model_validate(json.loads(text))
-    except (json.JSONDecodeError, ValidationError) as exc:
-        raise LLMError(f"Model reply is not a valid {output.__name__}: {exc.__class__.__name__}") from None
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        raise LLMOutputError(f"Model reply was not valid JSON; expected a {output.__name__} object") from None
+    try:
+        return output.model_validate(data)
+    except ValidationError as exc:
+        raise LLMOutputError(
+            f"Model reply is not a valid {output.__name__}: {_describe_validation_error(exc, output)}"
+        ) from None
 
 
 class OpenAICompatibleClient:

@@ -132,7 +132,7 @@ def generate_sql(
     return llm.complete_json(system, build_user_prompt(question, context, history), GeneratedSQL)
 
 
-REPAIR_PROMPT_VERSION = "sql-repair/2"
+REPAIR_PROMPT_VERSION = "sql-repair/3"
 
 _REPAIR_HINTS = {
     "timeout": (
@@ -158,23 +158,34 @@ class FailedAttempt:
     """What went wrong with the previous SQL, as fed back to the model for repair."""
 
     sql: str
-    stage: Literal["validation", "execution", "result"]
+    stage: Literal["generation", "validation", "execution", "result"]
     reason: str  # validator rejection code or database error category
     message: str
     plan: QueryPlan | None = None
 
 
+_INVALID_OUTPUT_HINT = (
+    "Reply with exactly one JSON object using the fields and types shown above, and no other "
+    'text. Include the required "explanation" field and use only the listed values.'
+)
+
+
 def build_repair_prompt(
     question: str, context: SchemaContext, failed: FailedAttempt, history: Sequence[Turn] = ()
 ) -> str:
+    parts = [build_user_prompt(question, context, history), ""]
+    if failed.stage == "generation":
+        # The reply was unusable, but it is untrusted: never quote it back. Only the sanitized
+        # description produced by the LLM client is forwarded so it cannot carry instructions.
+        parts.append(f"Your previous reply could not be used ({failed.reason}): {failed.message}")
+        parts.append(_INVALID_OUTPUT_HINT)
+        return "\n".join(parts)
     stage = {
         "validation": "was rejected by the SQL safety validator",
         "execution": "failed",
         "result": "ran, but its result failed a check",
     }[failed.stage]
-    parts = [
-        build_user_prompt(question, context, history),
-        "",
+    parts += [
         "Your previous plan:",
         failed.plan.model_dump_json() if failed.plan else "(none)",
         "",

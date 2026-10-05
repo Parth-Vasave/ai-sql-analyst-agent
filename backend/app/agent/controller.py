@@ -47,7 +47,7 @@ from app.agent.units import column_units
 from app.database.adapters import ErrorCategory
 from app.database.connections import DatabaseConnection
 from app.database.profile import SamplingMode
-from app.llm.client import LLMClient, LLMError
+from app.llm.client import LLMClient, LLMError, LLMOutputError
 from app.observability import current_request_id, log_event
 
 logger = logging.getLogger("app.agent")
@@ -216,7 +216,17 @@ class AgentController:
                         generated, call = repair_sql(
                             self.llm, question, context, meta.dialect, self.max_rows, failed, history
                         )
+            except LLMOutputError as exc:
+                # The provider replied, but the reply was not usable structured output. That is a
+                # repairable model-output failure: retry within the same budget, feeding back only
+                # the sanitized description (never the raw reply, which may hold injected text).
+                trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc))
+                if attempt > self.max_retries:
+                    return finish(self._error(question, meta, "llm_output", str(exc)))
+                failed = FailedAttempt("", "generation", "invalid_model_output", str(exc), None)
+                continue
             except LLMError as exc:
+                # A genuine provider failure (network, auth, rate limit): fail fast, no retry.
                 trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc))
                 return finish(self._error(question, meta, "llm_error", str(exc)))
             trace.record(
@@ -254,7 +264,7 @@ class AgentController:
                     metadata=meta,
                 )
                 return finish(outcome, reason="question cannot be answered from this database")
-            if failed is not None and _same_sql(generated.sql, failed.sql):
+            if failed is not None and failed.stage != "generation" and _same_sql(generated.sql, failed.sql):
                 trace.record(step, "failed", 0, attempt=attempt, error="repair returned the same SQL")
                 return finish(self._failed(question, meta, failed))
 
