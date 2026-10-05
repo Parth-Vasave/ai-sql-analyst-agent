@@ -1,9 +1,21 @@
 # AI SQL Analyst — frontend
 
-The console UI for the AI SQL Analyst backend: ask a question, watch it become a validated,
-read-only SQL query, and read the result as a live database session — plan, SQL, an execution
-trace, deterministic checks, a chart, and a grounded answer, in that order, exactly as the
-backend returns them.
+Two static pages built by Vite:
+
+- `/` (`index.html`, `src/home/`): the project homepage. It replays one real recorded answer in
+  the chat UI (`src/home/recordedAnswer.ts`) and shows the recorded safety and question runs
+  (`src/home/evaluation.ts`). `src/home/evaluation.test.ts` recomputes those numbers from
+  `../evaluation/results/*.jsonl`, so a new run means new result files and an update there.
+- `/chat/` (`chat/index.html`, `src/main.tsx`): the analyst app.
+
+Both are plain files in `dist/`, so any static host serves them without rewrite rules.
+
+The chat UI for the AI SQL Analyst backend, in the familiar two-pane layout of Claude.ai or
+ChatGPT: past chats in a left sidebar, a settings menu bottom-left (switch or connect a database,
+browse its schema, theme, help), and a conversation pane. Each answer shows the grounded answer,
+the result table and a chart, under a one-line verification summary that opens into the plan, the
+exact SQL that ran, step timings and every result check. Chats are kept in the browser's
+localStorage only; there are no accounts and the server keeps no conversation state.
 
 See `../DESIGN.md` for the design system and `../PRODUCT.md` for product context.
 
@@ -11,7 +23,7 @@ See `../DESIGN.md` for the design system and `../PRODUCT.md` for product context
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173, proxies /api to http://localhost:8000
+npm run dev        # http://localhost:5173 (homepage), /chat/ (app); proxies /api to http://localhost:8000
 ```
 
 The dev server expects the backend (see the repository root's `docker-compose.yml`) running at

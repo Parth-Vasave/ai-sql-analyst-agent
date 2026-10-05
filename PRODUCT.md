@@ -1,7 +1,5 @@
 # Product
 
-<!-- impeccable:product-schema 1 -->
-
 ## Platform
 
 web
@@ -85,6 +83,13 @@ No marketing chrome, no invented logos/testimonials/pricing/customer counts, no 
 selling a category. Credibility comes from showing real engineering (trace, safety checks, tests)
 plainly, not from persuading a visitor. No name/pseudonym for authorship has been decided.
 
+Interface convention (owner decision, 2026-10-04): the app uses the familiar chat-app layout of
+Claude.ai / ChatGPT — conversations listed in a left sidebar, a settings menu pinned bottom-left
+(database switching, connecting a database, schema, theme, help), and a soft, rounded chat look.
+This replaces the earlier "console transcript" look. There are no user accounts: chats are kept in
+the visitor's own browser. Convention is the commitment here; the distinctiveness lives in what
+each answer exposes, not in an unusual layout.
+
 ## Evidence on Hand
 
 - Dataset: Our World in Data, "CO2 and Greenhouse Gas Emissions" (CC BY 4.0), pinned commit
@@ -99,8 +104,9 @@ plainly, not from persuading a visitor. No name/pseudonym for authorship has bee
 
 1. Never trust the LLM's SQL — the validator and the read-only role are real and are the story;
    don't hide them behind a friendly chat box.
-2. Show the reasoning, not just the answer — plan, SQL, checks, and trace are first-class content,
-   not a debug drawer.
+2. Show the reasoning, not just the answer — every answer carries a visible verification summary
+   (validated, read-only, checks, timing) that opens into the plan, SQL, checks and trace; warnings
+   and retries are never hidden behind it.
 3. Report evaluation and safety status exactly as run; a partial or not-yet-run result says so.
 4. Read-only and safe by default, for any database the user connects — not just the OWID demo.
 5. Earn credibility as one person's rigorous work, not through SaaS marketing conventions.

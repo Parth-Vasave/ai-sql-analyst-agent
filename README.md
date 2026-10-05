@@ -80,7 +80,7 @@ docker compose run --rm seed         # download the pinned OWID data, clean it, 
 
 cd frontend
 npm install
-npm run dev                          # http://localhost:5173 (proxies /api to :8000)
+npm run dev                          # http://localhost:5173, the app at /chat/ (proxies /api to :8000)
 ```
 
 Try it without the UI:
@@ -123,7 +123,7 @@ backend/app/agent/       controller, SQL generator, validator, executor, result 
 backend/app/database/    connection registry, profiler, PostgreSQL adapter
 backend/app/llm/         OpenAI-compatible client with bounded retries
 backend/app/api/         FastAPI routes, schemas, rate limiting
-frontend/                React + TypeScript + Tailwind + Recharts console UI
+frontend/                React + TypeScript + Tailwind + Recharts: project homepage (/) and chat UI (/chat/)
 database/                schema, read-only role, sanity queries
 scripts/                 ingest (pinned, hash-verified), clean, seed
 evaluation/              question suite, ground truth, scoring, runner, report
