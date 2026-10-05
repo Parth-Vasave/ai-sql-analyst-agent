@@ -108,7 +108,7 @@ def test_empty_expected_matches_empty_result() -> None:
     assert result_matches({"columns": ["name"], "rows": []}, ["name"], [])[0]
 
 
-# --- set match (BIRD's execution accuracy) ------------------------------------------------
+# --- set match (BIRD's row-set rule, tolerant values) -------------------------------------
 
 
 def test_set_match_ignores_order_and_duplicate_rows() -> None:

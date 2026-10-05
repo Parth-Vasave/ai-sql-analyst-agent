@@ -8,8 +8,17 @@ from pathlib import Path
 from typing import Any, Literal
 
 from app.agent.controller import AgentResult, QueryError, QueryMetadata, TraceEvent
+from app.agent.result_checks import ResultCheck
+from app.agent.sql_generator import QueryPlan
 from evaluation.report import compute, render
-from evaluation.run import is_provider_failure, load_records, run_items, safety_items
+from evaluation.run import (
+    is_provider_failure,
+    load_records,
+    measured_tokens_per_question,
+    run_items,
+    safety_items,
+    token_estimate,
+)
 
 META = {
     "run_id": "t",
@@ -53,6 +62,18 @@ def result(
 
 
 QUOTA = QueryError(category="llm_error", message="LLM provider returned HTTP 429 after 3 attempts")
+DAILY_QUOTA = QueryError(
+    category="llm_error",
+    message="LLM provider returned HTTP 429 (quota used up; retry in 600 s)",
+    code="quota_exhausted",
+    retry_after_seconds=600,
+)
+PER_MINUTE = QueryError(
+    category="llm_error",
+    message="LLM provider returned HTTP 429 after 3 attempts (retry in 30 s)",
+    code="rate_limit",
+    retry_after_seconds=30,
+)
 
 
 def good(item) -> AgentResult:
@@ -176,3 +197,131 @@ def test_safety_items_are_all_expected_to_be_blocked() -> None:
     items = safety_items()
     assert len(items) >= 25 and {i["expected_behavior"] for i in items} == {"blocked"}
     assert len({i["id"] for i in items}) == len(items)
+
+
+def test_records_explain_the_answer_and_count_llm_use(tmp_path: Path) -> None:
+    trace = [
+        TraceEvent(step="sql_generation", status="success", duration_ms=5,
+                   detail={"attempt": 1, "prompt_tokens": 900, "completion_tokens": 100}),
+        TraceEvent(step="result_validation", status="failed", duration_ms=1,
+                   detail={"attempt": 1, "checks": ["missing_filter_value"]}),
+        TraceEvent(step="sql_repair", status="success", duration_ms=5,
+                   detail={"attempt": 2, "prompt_tokens": 1100, "completion_tokens": 120}),
+        TraceEvent(step="answer_generation", status="skipped", duration_ms=0, detail={}),
+    ]  # fmt: skip
+    answer = result(rows=[["China"], ["India"]], retries=1, trace=trace)
+    answer.explanation = "Top two by total CO2."
+    answer.plan = QueryPlan(intent="ranking", tables=["public.co2"], assumptions=["latest year"])
+    answer.checks = [ResultCheck(code="limit_applied", severity="info", message="m")]
+    _, records, _ = run(tmp_path, lambda item: answer if item["id"] == "Q1" else good(item))
+    record = records["Q1"]
+    assert record["explanation"] == "Top two by total CO2."
+    assert record["plan"]["tables"] == ["public.co2"] and record["plan"]["assumptions"] == ["latest year"]
+    assert record["checks"] == ["limit_applied"]
+    assert record["failed_steps"] == [
+        {"step": "result_validation", "attempt": 1, "reason": ["missing_filter_value"]}
+    ]
+    assert (record["llm_calls"], record["prompt_tokens"], record["completion_tokens"]) == (2, 2000, 220)
+    # Without token counts from the provider, tokens are unknown, not zero.
+    assert records["Q2"]["prompt_tokens"] is None and records["Q2"]["llm_calls"] == 0
+
+
+def test_a_used_up_daily_quota_stops_the_run_at_once(tmp_path: Path) -> None:
+    summary, records, lines = run(
+        tmp_path, lambda item: result("error", error=DAILY_QUOTA), max_provider_failures=3
+    )
+    assert summary.stopped_early and summary.attempted == 1
+    assert records["Q1"]["provider_failure"] and records["Q1"]["error_code"] == "quota_exhausted"
+    assert "Q2" not in records
+    assert any("quota is used up" in line for line in lines)
+    assert any("--run-id t" in line for line in lines)
+
+
+def test_a_per_minute_limit_is_waited_out_and_the_question_asked_again(tmp_path: Path) -> None:
+    sleeps: list[float] = []
+    asked: list[str] = []
+
+    def ask(item: dict[str, Any]) -> AgentResult:
+        asked.append(item["id"])
+        return result("error", error=PER_MINUTE) if asked.count(item["id"]) == 1 else good(item)
+
+    summary, records, _ = run(tmp_path, ask, sleep=sleeps.append)
+    assert asked == ["Q1", "Q1", "Q2", "Q2", "Q3", "Q3"] and sleeps == [30, 30, 30]
+    assert summary.provider_failures == 0 and all(r["correct"] for r in records.values())
+
+
+def test_a_long_per_minute_wait_is_not_waited_out(tmp_path: Path) -> None:
+    long_wait = PER_MINUTE.model_copy(update={"retry_after_seconds": 3600})
+    sleeps: list[float] = []
+    summary, _, _ = run(tmp_path, lambda item: result("error", error=long_wait), sleep=sleeps.append)
+    assert sleeps == [] and summary.provider_failures == 3
+
+
+def test_official_verdicts_are_added_to_scored_records_only(tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def official(item: dict[str, Any], answer: AgentResult) -> dict[str, Any]:
+        seen.append(item["id"])
+        return {"ex_correct": item["id"] == "Q1", "soft_f1": 1.0 if item["id"] == "Q1" else 0.5}
+
+    answers = {"Q2": result("error", error=QUOTA)}
+    summary = run_items(
+        QUESTIONS, lambda item: answers.get(item["id"], good(item)), EXPECTED, tmp_path / "r.jsonl", META, [],
+        log=print, official=official, max_provider_failures=5,
+    )  # fmt: skip
+    records = load_records(tmp_path / "r.jsonl")
+    assert summary.scored == 2 and seen == ["Q1", "Q3"]  # never for a question that was not run
+    assert records["Q1"]["ex_correct"] is True and "ex_correct" not in records["Q2"]
+    metrics = compute(records, ["Q1", "Q2", "Q3"], integrity_violations=0)
+    assert metrics["execution_accuracy"] == "1/2 (50%)" and metrics["soft_f1"] == "75.0%"
+
+
+def test_token_estimate_uses_measured_use_only(tmp_path: Path) -> None:
+    assert "unknown" in token_estimate(100, None, 200_000)
+    line = token_estimate(150, (2000.0, "96 questions of 1 earlier run(s)"), 200_000)
+    assert "about 300,000" in line and "1.5 x the daily budget" in line and "resuming" in line
+    assert "budget" not in token_estimate(10, (2000.0, "x"), None)
+
+    old = [
+        {"id": "B1", "dataset": "bird", "model": "m", "answers": "template", "correct": True,
+         "prompt_tokens": 1800, "completion_tokens": 200},
+        {"id": "B2", "dataset": "bird", "model": "m", "answers": "template", "correct": None,
+         "prompt_tokens": 50, "completion_tokens": 0},  # not run: not counted
+        {"id": "B3", "dataset": "bird", "model": "other", "answers": "template", "correct": False,
+         "prompt_tokens": 9000, "completion_tokens": 0},
+        {"id": "B4", "dataset": "bird", "model": "m", "answers": "template", "correct": False,
+         "prompt_tokens": 2600, "completion_tokens": 400},
+    ]  # fmt: skip
+    (tmp_path / "old.jsonl").write_text("\n".join(json.dumps(r) for r in old) + "\n")
+    assert measured_tokens_per_question("bird", "m", "template", tmp_path) == (
+        2500.0,
+        "2 questions of 1 earlier run(s)",
+    )
+    assert measured_tokens_per_question("bird", "m", "llm", tmp_path) is None
+    assert measured_tokens_per_question("owid", "m", "template", tmp_path) is None
+
+
+def test_bird_report_leads_with_the_official_metric_and_shows_the_review_beside_it(tmp_path: Path) -> None:
+    def record(qid: str, db: str, category: str, ex: bool, correct: bool) -> dict[str, Any]:
+        return {"id": qid, "db_id": db, "category": category, "expected_behavior": "query",
+                "status": "success", "correct": correct, "reason": "r", "set_correct": ex,
+                "ex_correct": ex, "soft_f1": 1.0 if ex else 0.0, "retry_count": 0,
+                "timed_out": False, "latency_ms": 10, "dataset": "bird", "max_rows": 50000,
+                "prompt_tokens": 1500, "completion_tokens": 500, "llm_calls": 1}  # fmt: skip
+
+    records = {
+        "B1": record("B1", "formula_1", "simple", True, True),
+        "B2": record("B2", "formula_1", "moderate", False, True),
+        "B3": record("B3", "financial", "simple", False, False),
+    }
+    review = {"B2": {"verdict": "ground_truth_error", "note": "n"}}
+    metrics = compute(records, ["B1", "B2", "B3"], integrity_violations=0, review=review)
+    assert metrics["execution_accuracy"] == "1/3 (33%)" and metrics["accuracy"] == "2/3 (67%)"
+    assert metrics["official_by_category"] == {"moderate": "0/1 (0%)", "simple": "1/2 (50%)"}
+    assert metrics["review"] == {"ground_truth_error": "0/1 (0%)", "not flagged": "1/2 (50%)"}
+    assert metrics["tokens_per_question"] == 2000 and metrics["llm_calls_per_question"] == 1
+    text = render(metrics)
+    assert "| **Execution accuracy (BIRD's official EX)** | **1/3 (33%)** |" in text
+    assert "| formula_1 | 2/2 (100%) | 1/2 (50%) |" in text
+    assert "| ground_truth_error | 0/1 (0%) |" in text and "row cap: 50,000" in text
+    assert "| Tokens per question | 2,000 (over 3 questions) |" in text

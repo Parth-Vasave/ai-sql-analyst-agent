@@ -136,9 +136,11 @@ def _distinct(rows: list[list[Any]]) -> list[tuple]:
 def set_match(
     expected: dict[str, Any], columns: list[str], rows: list[list[Any]], rel_tol: float = DEFAULT_REL_TOL
 ) -> bool:
-    """BIRD's execution accuracy: the same columns in the same order and the same SET of rows (row
-    order and duplicate rows are ignored). Stricter than `result_matches` about extra or reordered
-    columns, more lenient about duplicates. Values compare as in `values_equal`."""
+    """BIRD's execution-accuracy rule with tolerant values (bird.execution_accuracy is the exact,
+    official one): the same columns in the same order and the same SET of rows (row order and
+    duplicate rows are ignored). Stricter than `result_matches` about extra or reordered columns,
+    more lenient about duplicates. Values compare as in `values_equal`, so 0.333 matches 1/3 and
+    a number matches the same number stored as text, where BIRD's exact comparison fails both."""
     exp_rows, act_rows = _distinct(expected["rows"]), _distinct(rows)
     if not exp_rows or not act_rows:
         return not exp_rows and not act_rows

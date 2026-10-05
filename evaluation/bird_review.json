@@ -1,0 +1,42 @@
+{
+ "about": "Hand review of BIRD Mini-Dev questions whose ground truth looked wrong or ambiguous while checking the misses of run 20261005-103021-bird-database. Judgement, not measurement: the report shows it beside BIRD's official score and never changes that score. BIRD's answers are never edited. One review pass by the project (every 'ground_truth_error' was confirmed by running a corrected query, which returns a different result); not checked independently. Only questions seen so far are listed: an unlisted question is unreviewed, not correct.",
+ "reviewed": "2026-10-05",
+ "verdicts": {
+  "ground_truth_error": "BIRD's SQL does not answer the question, and a correct answer gives a different result (a bug in the SQL, or rows counted where the question asks for entities).",
+  "ground_truth_questionable": "BIRD's SQL contradicts the question or its own hint, but a reader could defend it.",
+  "ambiguous": "The question supports two readings that give different results; BIRD picked one."
+ },
+ "questions": {
+  "B0847": {"verdict": "ground_truth_error", "note": "Sorts NULLS FIRST, so it returns one of the six drivers with no Q2 time instead of the fastest."},
+  "B0906": {"verdict": "ground_truth_error", "note": "Orders only by year: an arbitrary one of 16 races in the first season, not the first race; points are the standings' running total."},
+  "B0944": {"verdict": "ground_truth_error", "note": "The time-string arithmetic yields NULL on PostgreSQL; the expected answer is a single NULL."},
+  "B0951": {"verdict": "ground_truth_error", "note": "Asks how many constructors; returns the number of races (2) of the one matching constructor."},
+  "B1168": {"verdict": "ground_truth_error", "note": "Returns an extra column (the birthday) that the question does not ask for, so no answer to the question matches exactly."},
+  "B1179": {"verdict": "ground_truth_error", "note": "The hint names one antibody column; the SQL returns three."},
+  "B1205": {"verdict": "ground_truth_error", "note": "A yes/no question about one patient; returns one row per lab record (67 rows)."},
+  "B1209": {"verdict": "ground_truth_error", "note": "DISTINCT ON the birthday drops a patient who shares a birthday: 89 rows for 90 patients."},
+  "B1241": {"verdict": "ground_truth_error", "note": "Counts lab records, not patients, and uses <= / >= where the hint says < / >: -562 instead of -46."},
+  "B1243": {"verdict": "ground_truth_error", "note": "The denominator COUNTs a CASE ... ELSE 0, which counts every row: 1.2% instead of 78.4%."},
+  "B1247": {"verdict": "ground_truth_error", "note": "Missing parentheses around the OR: 75 instead of 6."},
+  "B1251": {"verdict": "ground_truth_error", "note": "Joins a table the question does not mention, keeping only patients with an examination: 9 instead of 136."},
+  "B1252": {"verdict": "ground_truth_error", "note": "Counts joined rows, not patients: 4 instead of 1."},
+  "B1254": {"verdict": "ground_truth_error", "note": "Counts lab records, not patients (1590 instead of 133); bounds also differ from the hint."},
+  "B1256": {"verdict": "ground_truth_error", "note": "Counts lab records, not patients: 208 instead of 25."},
+  "B1265": {"verdict": "ground_truth_error", "note": "Missing parentheses around the OR: 47 instead of 35."},
+  "B1267": {"verdict": "ground_truth_error", "note": "Counts joined rows, not patients: 7 instead of 6."},
+  "B1302": {"verdict": "ground_truth_error", "note": "Counts joined rows, not patients: 7 instead of 1."},
+  "B1526": {"verdict": "ground_truth_error", "note": "Filters on a different price than the question and hint; no transaction matches either, and the expected answer is a single NULL."},
+  "B0928": {"verdict": "ground_truth_questionable", "note": "'Ranked first in the Grand Prix' read as fastest-lap rank 1 rather than the winner; also returns names besides the requested reference name."},
+  "B0930": {"verdict": "ground_truth_questionable", "note": "The hint says the minimum rank; the SQL uses rank = 1 (the data also has rank 0 as a placeholder)."},
+  "B1152": {"verdict": "ground_truth_questionable", "note": "The question asks outpatient to inpatient; the hint and the SQL compute the inverse."},
+  "B1169": {"verdict": "ground_truth_questionable", "note": "Asks for a ratio of patients; counts lab records (as the hint's formula literally does): 0.206 instead of 0.184."},
+  "B1175": {"verdict": "ground_truth_questionable", "note": "The hint computes age from the examination date; the SQL uses the lab date."},
+  "B1225": {"verdict": "ground_truth_questionable", "note": "The hint asks for one concatenated list per sex; the SQL returns one row per patient."},
+  "B1239": {"verdict": "ground_truth_questionable", "note": "The hint says more than two examinations, the SQL two or more (which matches the question)."},
+  "B1242": {"verdict": "ground_truth_questionable", "note": "The hint computes age from today; the SQL uses age at the lab date."},
+  "B0896": {"verdict": "ambiguous", "note": "'Position' exists for a race result and for the championship standings; BIRD uses the standings."},
+  "B0902": {"verdict": "ambiguous", "note": "'Position' exists for a race result and for the championship standings; BIRD uses the standings."},
+  "B0937": {"verdict": "ambiguous", "note": "'Ranked second' read as fastest-lap rank 2; the natural reading is finishing second."},
+  "B0950": {"verdict": "ambiguous", "note": "'Points at race 291' could be that race's points or the standings' running total; BIRD uses the standings."}
+ }
+}
