@@ -1,36 +1,40 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-type Theme = 'light' | 'dark'
+export type ThemePreference = 'light' | 'dark' | 'system'
 
-function systemTheme(): Theme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function storedTheme(): Theme | null {
+function storedPreference(): ThemePreference {
   try {
     const value = localStorage.getItem('theme')
-    return value === 'light' || value === 'dark' ? value : null
+    return value === 'light' || value === 'dark' ? value : 'system'
   } catch {
-    return null
+    return 'system'
   }
 }
 
-/** Manual override on top of prefers-color-scheme; remembered per browser only. */
-export function useTheme(): { theme: Theme; toggle: () => void } {
-  const [theme, setTheme] = useState<Theme>(() => storedTheme() ?? systemTheme())
+function systemTheme(): 'light' | 'dark' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/** Light, dark, or follow the OS; remembered per browser only. */
+export function useTheme(): { preference: ThemePreference; setPreference: (preference: ThemePreference) => void } {
+  const [preference, setPreference] = useState<ThemePreference>(storedPreference)
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    try {
-      localStorage.setItem('theme', theme)
-    } catch {
-      // private browsing or blocked storage: the toggle still works for this load
+    const apply = () => {
+      document.documentElement.dataset.theme = preference === 'system' ? systemTheme() : preference
     }
-  }, [theme])
+    apply()
+    try {
+      if (preference === 'system') localStorage.removeItem('theme')
+      else localStorage.setItem('theme', preference)
+    } catch {
+      // private browsing or blocked storage: the choice still applies for this load
+    }
+    if (preference !== 'system') return
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [preference])
 
-  const toggle = useCallback(() => {
-    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
-  }, [])
-
-  return { theme, toggle }
+  return { preference, setPreference }
 }

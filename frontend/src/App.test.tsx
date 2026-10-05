@@ -65,29 +65,78 @@ function successResult(overrides: Partial<AgentResult> = {}): AgentResult {
   }
 }
 
+const PROFILE = {
+  database_id: 'owid',
+  dialect: 'postgresql',
+  sampling: 'safe' as const,
+  fingerprint: 'x',
+  tables: [],
+  relationships: [],
+  notes: [],
+}
+
 beforeEach(() => {
   vi.mocked(client.fetchDatabases).mockResolvedValue([DATABASE])
+  vi.mocked(client.fetchProfile).mockResolvedValue(PROFILE)
   sessionStorage.clear()
+  localStorage.clear()
 })
 
+async function ask(question: string) {
+  await userEvent.type(await screen.findByLabelText(/ask a question/i), `${question}{Enter}`)
+}
+
+async function openSettings() {
+  await userEvent.click(await screen.findByRole('button', { name: /settings and database/i }))
+}
+
 describe('App', () => {
-  it('shows the mechanism explanation before any question is asked', async () => {
+  it('shows the safety promise and the connected database before any question is asked', async () => {
     render(<App />)
-    expect(await screen.findByText(/never trusted on its own/i)).toBeInTheDocument()
+    expect(await screen.findByText(/checked as a single read-only query before it runs/i)).toBeInTheDocument()
+    expect(await screen.findAllByText('owid_co2')).not.toHaveLength(0)
   })
 
-  it('asks a question and renders the answer, SQL and trace', async () => {
+  it('offers example questions only on the demo database, and runs one when clicked', async () => {
+    vi.mocked(client.fetchProfile).mockResolvedValue({
+      ...PROFILE,
+      tables: [{ schema_name: 'public', name: 'co2_emissions', kind: 'table', comment: null, estimated_rows: null, columns: [] }],
+    })
     vi.mocked(client.runQuery).mockResolvedValue(successResult())
     render(<App />)
-    await screen.findByPlaceholderText(/ask a question/i)
 
-    await userEvent.type(screen.getByLabelText(/ask a question/i), 'Which country emitted the most CO2 in 2023?{Enter}')
+    await userEvent.click(await screen.findByRole('button', { name: /which 5 countries emitted the most co2 in 2023/i }))
+
+    await waitFor(() =>
+      expect(client.runQuery).toHaveBeenCalledWith(expect.objectContaining({ question: 'Which 5 countries emitted the most CO2 in 2023?' }), expect.any(AbortSignal)),
+    )
+  })
+
+  it('does not offer demo examples on another database', async () => {
+    render(<App />)
+    expect(await screen.findByText(/what would you like to know/i)).toBeInTheDocument()
+    await waitFor(() => expect(client.fetchProfile).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: /which 5 countries/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /see what's in this database/i })).toBeInTheDocument()
+  })
+
+  it('asks a question and renders the answer, result, and the SQL and trace behind it', async () => {
+    vi.mocked(client.runQuery).mockResolvedValue(successResult())
+    render(<App />)
+
+    await ask('Which country emitted the most CO2 in 2023?')
 
     expect(await screen.findByText(/China emitted the most CO2 in 2023/)).toBeInTheDocument()
-    expect(screen.getByText(/SELECT country, co2 FROM co2_emissions/)).toBeInTheDocument()
     expect(screen.getByText('China')).toBeInTheDocument()
+    expect(screen.getByText(/Assumed: latest available year/)).toBeInTheDocument()
+    expect(screen.queryByText(/SELECT country, co2 FROM co2_emissions/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /validated read-only sql/i }))
+    expect(screen.getByText(/SELECT country, co2 FROM co2_emissions/)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /execution trace: sql_generation 340ms success/ })).toBeInTheDocument()
     expect(client.runQuery).toHaveBeenCalledWith(
       expect.objectContaining({ question: 'Which country emitted the most CO2 in 2023?', database_id: 'owid' }),
+      expect.any(AbortSignal),
     )
   })
 
@@ -104,8 +153,7 @@ describe('App', () => {
       }),
     )
     render(<App />)
-    await screen.findByPlaceholderText(/ask a question/i)
-    await userEvent.type(screen.getByLabelText(/ask a question/i), 'Who emits the most?{Enter}')
+    await ask('Who emits the most?')
 
     expect(await screen.findByText('Which year do you mean?')).toBeInTheDocument()
   })
@@ -113,8 +161,7 @@ describe('App', () => {
   it('shows a rate-limit error with a retry affordance', async () => {
     vi.mocked(client.runQuery).mockRejectedValue(new ApiError('Too many questions. Try again in 30 s.', 429, 30, 'req-2'))
     render(<App />)
-    await screen.findByPlaceholderText(/ask a question/i)
-    await userEvent.type(screen.getByLabelText(/ask a question/i), 'Another question{Enter}')
+    await ask('Another question')
 
     expect(await screen.findByText(/rate limited/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /retry in 30s/i })).toBeDisabled()
@@ -126,23 +173,26 @@ describe('App', () => {
     vi.mocked(client.runQuery).mockResolvedValue(successResult())
     render(<App />)
 
-    const select = await screen.findByLabelText(/connected database/i)
-    await userEvent.selectOptions(select, 'other')
-    await userEvent.type(screen.getByLabelText(/ask a question/i), 'A question{Enter}')
+    await openSettings()
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: /other_db/ }))
+    await ask('A question')
 
-    await waitFor(() => expect(client.runQuery).toHaveBeenCalledWith(expect.objectContaining({ database_id: 'other' })))
+    await waitFor(() => expect(client.runQuery).toHaveBeenCalledWith(expect.objectContaining({ database_id: 'other' }), expect.any(AbortSignal)))
   })
 
-  it('opens and closes the connect, schema and help panels', async () => {
+  it('opens the connect, schema and help dialogs from the settings menu', async () => {
     render(<App />)
-    await screen.findByPlaceholderText(/ask a question/i)
 
-    await userEvent.click(screen.getByRole('button', { name: /connect a database/i }))
+    await openSettings()
+    await userEvent.click(screen.getByRole('menuitem', { name: /connect a database/i }))
     expect(await screen.findByLabelText(/connection url/i)).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: /open help/i }))
-    expect(await screen.findByText(/asking questions/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.queryByLabelText(/connection url/i)).not.toBeInTheDocument()
+
+    await openSettings()
+    await userEvent.click(screen.getByRole('menuitem', { name: /how it works/i }))
+    expect(await screen.findByText(/asking questions/i)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^close$/i }))
 
     vi.mocked(client.fetchProfile).mockResolvedValue({
       database_id: 'owid',
@@ -153,19 +203,67 @@ describe('App', () => {
       relationships: [],
       notes: [],
     })
-    await userEvent.click(screen.getByRole('button', { name: /browse the active database's schema/i }))
+    await openSettings()
+    await userEvent.click(screen.getByRole('menuitem', { name: /browse schema/i }))
     expect(await screen.findByText(/0 tables, sampling: safe/)).toBeInTheDocument()
   })
 
-  it('restores completed turns from a previous session', async () => {
+  it('lists saved chats in the sidebar and reopens one without re-running it', async () => {
     const result = successResult()
-    sessionStorage.setItem(
-      'ai-sql-analyst:session',
-      JSON.stringify([{ id: 't1', question: result.question, result }]),
+    const now = Date.now()
+    localStorage.setItem(
+      'ai-sql-analyst:chats',
+      JSON.stringify([{ id: 'c1', title: result.question, createdAt: now, updatedAt: now, turns: [{ id: 't1', question: result.question, result }] }]),
     )
     render(<App />)
 
+    await userEvent.click(await screen.findByRole('button', { name: result.question }))
+
     expect(await screen.findByText(/China emitted the most CO2 in 2023/)).toBeInTheDocument()
     expect(client.runQuery).not.toHaveBeenCalled()
+  })
+
+  it('keeps each question in its own chat, sends follow-up history, and starts fresh on New chat', async () => {
+    vi.mocked(client.runQuery).mockResolvedValue(successResult())
+    render(<App />)
+
+    await ask('First question')
+    await screen.findByText(/China emitted the most CO2 in 2023/)
+    await ask('And in 2020?')
+    await waitFor(() => expect(client.runQuery).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(client.runQuery).mock.calls[1][0].history).toHaveLength(1)
+
+    await userEvent.click(screen.getByRole('button', { name: /^new chat$/i }))
+    expect(await screen.findByText(/what would you like to know/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'First question' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /delete chat: first question/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+    expect(screen.queryByRole('button', { name: 'First question' })).not.toBeInTheDocument()
+  })
+
+  it('stops waiting for an answer and offers to ask again', async () => {
+    vi.mocked(client.runQuery).mockImplementation(
+      (_body, signal) => new Promise((_resolve, reject) => signal?.addEventListener('abort', () => reject(new ApiError('aborted', 0)))),
+    )
+    render(<App />)
+    await ask('A slow question')
+
+    await userEvent.click(await screen.findByRole('button', { name: /stop waiting for the answer/i }))
+
+    expect(await screen.findByText(/stopped before an answer came back/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ask again/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /send question/i })).toBeInTheDocument()
+  })
+
+  it('names a provider rate limit in plain language with its recovery', async () => {
+    vi.mocked(client.runQuery).mockResolvedValue(
+      successResult({ status: 'error', error: { category: 'provider', message: 'LLM provider returned HTTP 429', code: null }, answer: null, columns: [], rows: [] }),
+    )
+    render(<App />)
+    await ask('Anything')
+
+    expect(await screen.findByText(/model provider is rate-limiting requests/i)).toBeInTheDocument()
+    expect(screen.getByText(/wait a minute, then retry/i)).toBeInTheDocument()
   })
 })

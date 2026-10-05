@@ -1,9 +1,8 @@
 import type { ChartSpec } from '../api/types'
 
 /**
- * Charts get their own quiet, non-alert palette: the accent color (amber) is reserved for
- * held/retry state in the trace strip and must never appear here, or a routine chart would
- * read as an alert. Mid-tone hues, none in the amber/orange/red range, legible on both
+ * Charts get their own quiet, non-alert palette: the accent color (amber) means focus, warning
+ * or error everywhere else and must never appear here, or a routine chart would read as an alert. Mid-tone hues, none in the amber/orange/red range, legible on both
  * near-white and near-black grounds.
  */
 export const SERIES_COLORS = [

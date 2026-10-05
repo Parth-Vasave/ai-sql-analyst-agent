@@ -52,10 +52,11 @@ export function fetchDatabases(): Promise<DatabaseInfo[]> {
   return request<DatabaseInfo[]>('/api/databases')
 }
 
-export function runQuery(body: QueryRequest): Promise<AgentResult> {
+export function runQuery(body: QueryRequest, signal?: AbortSignal): Promise<AgentResult> {
   return request<AgentResult>('/api/query', {
     method: 'POST',
     body: JSON.stringify(body),
+    signal,
   })
 }
 

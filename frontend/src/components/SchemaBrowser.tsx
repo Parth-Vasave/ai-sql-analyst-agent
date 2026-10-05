@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { fetchProfile } from '../api/client'
 import { ApiError, type ColumnProfile, type DatabaseProfile, type TableProfile } from '../api/types'
+import { Dialog } from './Dialog'
+import { AlertIcon, ChevronIcon } from './icons'
 
 interface SchemaBrowserProps {
   databaseId: string
@@ -34,74 +36,77 @@ export function SchemaBrowser({ databaseId, databaseName, onClose }: SchemaBrows
   const error = current?.error ?? null
   const loading = current === null
 
+  const summary = profile
+    ? `${profile.tables.length} table${profile.tables.length === 1 ? '' : 's'}, sampling: ${profile.sampling}`
+    : null
+
   return (
-    <div className="border-b border-line bg-paper-raised px-4 py-4 sm:px-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-3 font-mono text-[14px]">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-ink-dim">
-            <span className="text-accent">{':schema'}</span> {databaseName}
-            {profile && (
-              <span className="text-ink-faint">
-                {' '}
-                — {profile.tables.length} table{profile.tables.length === 1 ? '' : 's'}, sampling: {profile.sampling}
-              </span>
-            )}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 px-2 py-0.5 text-ink-faint transition-colors hover:text-ink-dim"
-          >
-            close
-          </button>
-        </div>
+    <Dialog
+      title={`Schema · ${databaseName}`}
+      description={
+        <>
+          What the profiler found{summary && <span className="text-ink-faint"> — {summary}</span>}. This is exactly
+          the context the model is given, so it is also what it can and can't answer about.
+        </>
+      }
+      onClose={onClose}
+      wide
+    >
+      <div className="flex flex-col gap-2 text-[14px]">
+        {loading && <p className="py-6 text-center text-ink-faint">Loading schema…</p>}
+        {error && <Callout>{error.message}</Callout>}
 
-        {loading && <p className="text-ink-faint">loading schema…</p>}
-        {error && <p className="text-accent">[error] {error.message}</p>}
-
-        {profile && (
-          <div className="flex flex-col gap-2">
-            {profile.tables.map((table) => (
-              <TableDisclosure key={`${table.schema_name}.${table.name}`} table={table} />
-            ))}
-            {profile.relationships.length > 0 && (
-              <details className="border border-line">
-                <summary className="cursor-pointer px-2 py-1.5 text-ink-dim hover:text-ink">
-                  joins ({profile.relationships.length})
-                </summary>
-                <ul className="border-t border-line px-2 py-1.5 text-ink-faint">
-                  {profile.relationships.map((rel, i) => (
-                    <li key={i}>
-                      {rel.from_table}.{rel.from_columns.join(', ')} → {rel.to_table}.{rel.to_columns.join(', ')}
-                      {rel.inferred && <span className="text-ink-faint"> (inferred)</span>}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-            {profile.notes.length > 0 && (
-              <p className="text-ink-faint">{profile.notes.join(' ')}</p>
-            )}
-          </div>
+        {profile &&
+          profile.tables.map((table) => <TableDisclosure key={`${table.schema_name}.${table.name}`} table={table} />)}
+        {profile && profile.relationships.length > 0 && (
+          <details className="group rounded-xl border border-line">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-ink-dim hover:text-ink">
+              <ChevronIcon size={16} className="transition-transform group-open:rotate-90" />
+              Joins ({profile.relationships.length})
+            </summary>
+            <ul className="space-y-1 border-t border-line px-3 py-2.5 font-mono text-[13px] text-ink-dim">
+              {profile.relationships.map((rel, i) => (
+                <li key={i}>
+                  {rel.from_table}.{rel.from_columns.join(', ')} → {rel.to_table}.{rel.to_columns.join(', ')}
+                  {rel.inferred && <span className="text-ink-faint"> (inferred)</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
+        {profile && profile.notes.length > 0 && <p className="text-[13px] text-ink-faint">{profile.notes.join(' ')}</p>}
       </div>
-    </div>
+    </Dialog>
+  )
+}
+
+function Callout({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex items-start gap-2 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2.5 text-ink">
+      <AlertIcon className="mt-0.5 shrink-0 text-accent" size={16} />
+      {children}
+    </p>
   )
 }
 
 function TableDisclosure({ table }: { table: TableProfile }) {
   return (
-    <details className="border border-line" open={table.columns.length <= 6}>
-      <summary className="cursor-pointer px-2 py-1.5 text-ink hover:bg-paper">
-        {table.schema_name}.{table.name}
-        <span className="text-ink-faint">
-          {' '}
-          · {table.columns.length} column{table.columns.length === 1 ? '' : 's'}
-          {table.estimated_rows != null && ` · ~${table.estimated_rows.toLocaleString()} rows`}
+    <details className="group rounded-xl border border-line" open={table.columns.length <= 6}>
+      <summary className="flex cursor-pointer list-none items-start gap-2 rounded-xl px-3 py-2.5 hover:bg-raised/60">
+        <ChevronIcon size={16} className="mt-0.5 shrink-0 text-ink-faint transition-transform group-open:rotate-90" />
+        <span className="min-w-0">
+          <span className="font-mono text-[13.5px] font-medium">
+            {table.schema_name}.{table.name}
+          </span>
+          <span className="text-[13px] text-ink-faint">
+            {' '}
+            · {table.columns.length} column{table.columns.length === 1 ? '' : 's'}
+            {table.estimated_rows != null && ` · ~${table.estimated_rows.toLocaleString()} rows`}
+          </span>
+          {table.comment && <span className="block text-[13px] text-ink-dim">{table.comment}</span>}
         </span>
-        {table.comment && <span className="block text-[13px] text-ink-faint">{table.comment}</span>}
       </summary>
-      <table className="w-full border-t border-line text-left text-[13.5px]">
+      <table className="w-full border-t border-line text-left text-[13px]">
         <tbody>
           {table.columns.map((column) => (
             <ColumnRow key={column.name} column={column} />
@@ -115,13 +120,13 @@ function TableDisclosure({ table }: { table: TableProfile }) {
 function ColumnRow({ column }: { column: ColumnProfile }) {
   return (
     <tr className="border-t border-line first:border-t-0">
-      <td className="px-2 py-1 whitespace-nowrap text-ink">
+      <td className="py-1.5 pr-3 pl-9 font-mono whitespace-nowrap text-ink">
         {column.name}
-        {column.primary_key && <span className="text-ink-faint"> pk</span>}
-        {column.sensitive && <span className="text-accent"> sensitive</span>}
+        {column.primary_key && <span className="ml-1.5 font-sans text-[11px] text-ink-faint uppercase">pk</span>}
+        {column.sensitive && <span className="ml-1.5 font-sans text-[11px] text-accent uppercase">sensitive</span>}
       </td>
-      <td className="px-2 py-1 whitespace-nowrap text-ink-faint">{column.type.toLowerCase()}</td>
-      <td className="w-full px-2 py-1 text-ink-faint">
+      <td className="py-1.5 pr-3 font-mono whitespace-nowrap text-ink-faint">{column.type.toLowerCase()}</td>
+      <td className="w-full py-1.5 pr-3 text-ink-dim">
         {column.comment}
         {hintSummary(column) && <span>{column.comment ? ' — ' : ''}{hintSummary(column)}</span>}
       </td>

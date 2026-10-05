@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { CheckIcon, CopyIcon } from './icons'
 
-export function CopyButton({ text, label = 'copy' }: { text: string; label?: string }) {
+export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false)
 
   async function handleClick() {
@@ -17,9 +18,10 @@ export function CopyButton({ text, label = 'copy' }: { text: string; label?: str
     <button
       type="button"
       onClick={handleClick}
-      className="shrink-0 px-1.5 py-0.5 font-mono text-[12px] text-ink-faint transition-colors hover:text-ink-dim"
+      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[13px] text-ink-faint transition-colors hover:bg-raised hover:text-ink"
     >
-      {copied ? 'copied' : label}
+      {copied ? <CheckIcon size={15} className="text-ok" /> : <CopyIcon size={15} />}
+      {copied ? 'Copied' : label}
     </button>
   )
 }

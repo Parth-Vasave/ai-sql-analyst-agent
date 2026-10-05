@@ -19,3 +19,17 @@ if (!window.matchMedia) {
   })
 }
 
+// jsdom does not implement element scrolling; the conversation pane scrolls to its latest answer.
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => {}
+}
+
+// jsdom does not implement modal dialogs; open/close is all the components rely on.
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    this.open = false
+  }
+}

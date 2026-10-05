@@ -2,112 +2,154 @@
 
 @theme {
   --font-mono: 'JetBrains Mono', ui-monospace, 'Menlo', 'Consolas', monospace;
-  --font-sans: 'IBM Plex Sans', 'Segoe UI', ui-sans-serif, sans-serif;
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
 
-  /* Light mode (default). Dark mode redefines the same custom properties below.
-     ink-dim and ink-faint are both tuned to clear 4.5:1 on --color-paper; only
-     the decorative separator dots and status dots go lighter than that. */
-  --color-paper: #faf9f7;
-  --color-paper-raised: #f1efec;
-  --color-ink: #16181c;
-  --color-ink-dim: #5b6169;
-  --color-ink-faint: #666c74;
-  --color-line: #dbdcdc;
+  /* Light (default). Dark redefines the same custom properties below.
+     surface: the conversation pane. sidebar: the chat list, one step darker.
+     raised: user bubbles, hovered and selected rows. code: SQL and table headers. */
+  --color-surface: #ffffff;
+  --color-sidebar: #f8f8f7;
+  --color-raised: #efefee;
+  --color-code: #f6f6f5;
+  --color-ink: #141416;
+  --color-ink-dim: #55565c;
+  --color-ink-faint: #6c6d74;
+  --color-line: #e4e4e2;
 
-  /* The one reserved signal color: held/alert/retry state, and nothing else — a rejected
-     (non-read-only) connection reuses it too, since that genuinely is an alert. A healthy
-     connection is reported in plain ink, not a second hue: "ready" is the unremarkable case.
-     Darkened from the "true" amber so it clears 4.5:1 as body text on paper. */
+  /* Amber: focus rings, warnings, errors, a rejected connection.
+     Dark enough in light mode to clear 4.5:1 as text on white. */
   --color-accent: #9a5a1f;
-  --color-accent-soft: #f1e3d1;
+  --color-accent-soft: #fbf1e4;
+  /* The validated-read-only tick: the one "good" signal. */
+  --color-ok: #2c7a56;
+
+  --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
+  --shadow-menu: 0 2px 6px rgb(0 0 0 / 0.06), 0 12px 32px rgb(0 0 0 / 0.12);
 }
 
-:root:not([data-theme='light']) {
-  @media (prefers-color-scheme: dark) {
-    --color-paper: #111215;
-    --color-paper-raised: #191a1e;
-    --color-ink: #e7e8ea;
-    --color-ink-dim: #9a9fa6;
-    --color-ink-faint: #7d838b;
-    --color-line: #2b2d31;
+@layer base {
+  :root:not([data-theme='light']) {
+    @media (prefers-color-scheme: dark) {
+      --color-surface: #212122;
+      --color-sidebar: #18181a;
+      --color-raised: #303033;
+      --color-code: #1b1b1d;
+      --color-ink: #ececee;
+      --color-ink-dim: #b2b3b9;
+      --color-ink-faint: #8f9097;
+      --color-line: #343437;
+      --color-accent: #e0a35a;
+      --color-accent-soft: #3a2c1a;
+      --color-ok: #5cbb8e;
+      --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+      --shadow-menu: 0 2px 6px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.45);
+    }
+  }
 
-    --color-accent: #d99a4e;
+  :root[data-theme='dark'] {
+    --color-surface: #212122;
+    --color-sidebar: #18181a;
+    --color-raised: #303033;
+    --color-code: #1b1b1d;
+    --color-ink: #ececee;
+    --color-ink-dim: #b2b3b9;
+    --color-ink-faint: #8f9097;
+    --color-line: #343437;
+    --color-accent: #e0a35a;
     --color-accent-soft: #3a2c1a;
+    --color-ok: #5cbb8e;
+    --shadow-composer: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+    --shadow-menu: 0 2px 6px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.45);
   }
 }
 
-:root[data-theme='dark'] {
-  --color-paper: #111215;
-  --color-paper-raised: #191a1e;
-  --color-ink: #e7e8ea;
-  --color-ink-dim: #9a9fa6;
-  --color-ink-faint: #7d838b;
-  --color-line: #2b2d31;
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
 
-  --color-accent: #d99a4e;
-  --color-accent-soft: #3a2c1a;
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Browser surfaces belong to the palette too: selection, caret, focus, scrollbars. */
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+
+  input,
+  select,
+  textarea {
+    caret-color: var(--color-accent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-color: var(--color-line) transparent;
+    scrollbar-width: thin;
+  }
+
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.4);
+  }
 }
 
-html {
-  color-scheme: light dark;
+/* A horizontally scrolling table shows a soft edge where columns continue out of view; the
+   shadows ride with the scroll position (background-attachment: local covers them at the ends). */
+.scroll-shadow-x {
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--color-surface) 30%, transparent) right / 2rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.14), transparent) left / 0.75rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.14), transparent) right / 0.75rem 100% no-repeat scroll;
 }
 
-body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-}
-
-/* Browser surfaces belong to the palette too: selection, caret, focus, scrollbars. */
-::selection {
-  background: var(--color-accent-soft);
-  color: var(--color-ink);
-}
-
-input,
-select {
-  caret-color: var(--color-accent);
-}
-
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-* {
-  scrollbar-color: var(--color-ink-faint) transparent;
-  scrollbar-width: thin;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: var(--color-ink-faint);
-  border: 2px solid var(--color-paper);
-  border-radius: 999px;
-}
-
-/* The one authored motion moment: a real terminal cursor while a question runs. */
-@keyframes cursor-blink {
+/* The waiting state: three dots breathing in sequence while the agent works. */
+@keyframes pulse-dot {
   0%,
-  49% {
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
     opacity: 1;
   }
-  50%,
-  100% {
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+/* Menus and dialogs settle in from 4px below rather than appearing. */
+@keyframes rise-in {
+  from {
     opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.cursor-blink {
-  animation: cursor-blink 1s step-end infinite;
+.rise-in {
+  animation: rise-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,21 +2,23 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { addDatabase } from '../api/client'
 import { ApiError, type DatabaseInfo, type SamplingMode } from '../api/types'
+import { Dialog } from './Dialog'
+import { AlertIcon } from './icons'
 
 const SAMPLING_OPTIONS: { value: SamplingMode; label: string; hint: string }[] = [
   {
     value: 'safe',
-    label: 'safe — numeric/date ranges + short category values',
+    label: 'Safe — numeric/date ranges and short category values',
     hint: 'Numeric/date ranges and the complete set of values of short categorical columns leave the database. Free text and sensitive-looking columns (email, password, phone, token, ...) are never sampled.',
   },
   {
     value: 'off',
-    label: 'off — structure only, no values leave the database',
+    label: 'Off — structure only, no values leave the database',
     hint: 'Only table/column names, types and comments leave the database. No row values at all.',
   },
   {
     value: 'full',
-    label: 'full — safe + a few example text values',
+    label: 'Full — safe, plus a few example text values',
     hint: 'Adds a few truncated example values from other text columns (still never sensitive-looking ones), sent to the LLM provider as schema context. Avoid this on databases with free text you would not want leaving the database.',
   },
 ]
@@ -62,76 +64,79 @@ export function ConnectDatabaseForm({ onConnected, onCancel }: ConnectDatabaseFo
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-b border-line bg-paper-raised px-4 py-4 sm:px-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-3 font-mono text-[14px]">
-        <p className="text-ink-dim">
-          <span className="text-accent">{':connect'}</span> add a database — read-only accounts only; a
-          writable account is refused after connecting
-        </p>
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] text-ink-faint">name</span>
+    <Dialog
+      title="Connect a database"
+      description="Read-only accounts only: an account that can write data is refused after connecting, with the privileges that disqualified it."
+      onClose={pending ? () => {} : onCancel}
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-[14px]">
+        <label className="flex flex-col gap-1.5">
+          <span className="font-medium">Name</span>
           <input
             type="text"
             value={name}
             onChange={(event) => setName(event.target.value.slice(0, 100))}
-            placeholder="my shop database"
+            placeholder="My shop database"
             autoFocus
             maxLength={100}
-            className="border border-line bg-transparent px-2 py-1.5 text-ink outline-none placeholder:text-ink-faint focus-visible:ring-1 focus-visible:ring-accent"
+            className={FIELD}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] text-ink-faint">connection url</span>
+        <label className="flex flex-col gap-1.5">
+          <span className="font-medium">Connection URL</span>
           <input
             type="password"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             placeholder="postgresql://user:password@host:5432/dbname"
             aria-invalid={urlTouched && !urlValid}
-            className="border border-line bg-transparent px-2 py-1.5 text-ink outline-none placeholder:text-ink-faint focus-visible:ring-1 focus-visible:ring-accent aria-invalid:border-accent"
+            autoComplete="off"
+            className={`${FIELD} font-mono text-[13px] aria-invalid:border-accent`}
           />
-          {urlTouched && !urlValid && (
-            <span className="text-[12px] text-accent">expected scheme://user:password@host:port/database</span>
+          {urlTouched && !urlValid ? (
+            <span className="text-[13px] text-accent">Expected scheme://user:password@host:port/database</span>
+          ) : (
+            <span className="text-[13px] text-ink-faint">Sent to the API server to connect; not saved in this browser.</span>
           )}
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[12px] text-ink-faint">sampling</span>
-          <select
-            value={sampling}
-            onChange={(event) => setSampling(event.target.value as SamplingMode)}
-            className="border border-line bg-transparent px-2 py-1.5 text-ink outline-none focus-visible:ring-1 focus-visible:ring-accent"
-          >
+        <label className="flex flex-col gap-1.5">
+          <span className="font-medium">Sampling</span>
+          <select value={sampling} onChange={(event) => setSampling(event.target.value as SamplingMode)} className={FIELD}>
             {SAMPLING_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
-          <span className="text-[12px] text-ink-faint">{selectedSampling.hint}</span>
+          <span className="text-[13px] leading-relaxed text-ink-faint">{selectedSampling.hint}</span>
         </label>
         {error && (
-          <p className="text-accent">
-            [error] {error.message}
+          <p className="flex items-start gap-2 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2.5 text-ink" role="alert">
+            <AlertIcon className="mt-0.5 shrink-0 text-accent" size={16} />
+            {error.message}
           </p>
         )}
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={pending || !name.trim() || !urlValid}
-            className="border border-line px-3 py-1.5 text-ink-dim transition-colors hover:border-ink-faint hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {pending ? 'connecting…' : 'connect'}
-          </button>
+        <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             onClick={onCancel}
             disabled={pending}
-            className="px-3 py-1.5 text-ink-faint transition-colors hover:text-ink-dim disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full px-4 py-2 font-medium text-ink-dim transition-colors hover:bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
           >
-            cancel
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={pending || !name.trim() || !urlValid}
+            className="rounded-full bg-ink px-4 py-2 font-medium text-surface transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            {pending ? 'Connecting…' : 'Connect'}
           </button>
         </div>
-      </div>
-    </form>
+      </form>
+    </Dialog>
   )
 }
+
+const FIELD =
+  'rounded-xl border border-line bg-surface px-3 py-2 text-ink outline-none transition-colors placeholder:text-ink-faint focus-visible:border-ink-faint focus-visible:outline-none'

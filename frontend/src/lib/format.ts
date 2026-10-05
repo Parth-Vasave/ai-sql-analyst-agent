@@ -3,10 +3,25 @@ export function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)}s`
 }
 
-export function formatCell(value: unknown, unit?: string): string {
+/** A year is an identifier, not a quantity: 2015, never 2,015. */
+export function isYearColumn(column: string): boolean {
+  return /(^|_)year$/i.test(column)
+}
+
+/**
+ * `digits` fixes the fraction digits so a right-aligned column's decimal points line up
+ * (see `columnDecimals`); without it, a number shows up to 3 decimals as it comes.
+ */
+export function formatCell(value: unknown, unit?: string, column?: string, digits?: number): string {
   if (value === null || value === undefined) return '∅'
+  if (typeof value === 'number' && column && isYearColumn(column) && Number.isInteger(value)) return String(value)
   if (typeof value === 'number') {
-    const formatted = Number.isInteger(value) ? value.toLocaleString('en-US') : value.toLocaleString('en-US', { maximumFractionDigits: 3 })
+    const formatted =
+      digits !== undefined
+        ? value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+        : Number.isInteger(value)
+          ? value.toLocaleString('en-US')
+          : value.toLocaleString('en-US', { maximumFractionDigits: 3 })
     return unit ? `${formatted} ${unit}` : formatted
   }
   return String(value)
@@ -20,4 +35,17 @@ export function formatRowCount(n: number): string {
 export function columnLabel(column: string, units: Record<string, string>): string {
   const unit = units[column]
   return unit ? `${column} (${unit})` : column
+}
+
+/** The most fraction digits any value in a numeric column needs, capped at 3. */
+export function columnDecimals(rows: unknown[][], index: number): number {
+  let digits = 0
+  for (const row of rows) {
+    const value = row[index]
+    if (typeof value !== 'number' || Number.isInteger(value)) continue
+    const fraction = value.toFixed(3).replace(/0+$/, '').split('.')[1] ?? ''
+    digits = Math.max(digits, fraction.length)
+    if (digits === 3) break
+  }
+  return digits
 }
