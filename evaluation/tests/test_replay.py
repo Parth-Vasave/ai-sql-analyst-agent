@@ -136,6 +136,13 @@ def test_the_repair_loop_recovers_from_a_broken_first_reply(
     record = records[question_id]
     assert record["correct"] is True, record
     assert record["retry_count"] == 1
+    # The record says what went wrong first, and that the repair cost a second LLM call.
+    assert [f["step"] for f in record["failed_steps"]] in (
+        ["sql_validation"],
+        ["query_execution"],
+        ["result_validation"],
+    )
+    assert record["llm_calls"] == 2
 
 
 def test_a_question_that_stays_broken_fails_after_the_retry_budget(

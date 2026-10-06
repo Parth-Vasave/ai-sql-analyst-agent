@@ -5,13 +5,16 @@ Groq, OpenRouter, Ollama, ...). Every reply must be a JSON object that validates
 the Pydantic model the caller asks for: model output is never used unvalidated.
 
 Transient provider failures (rate limits, overload) are retried a bounded number of times
-with a short wait, so a free-tier hiccup does not fail the whole question.
+with a short wait, so a free-tier hiccup does not fail the whole question. A failure that waiting
+will not fix (a daily or account quota used up) is not retried, and is reported as such: LLMError.code says
+what kind of failure it was, and retry_after_seconds when the provider said how long to wait.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,10 +31,30 @@ logger = logging.getLogger("app.llm")
 
 # Rate limited, or the provider is overloaded / briefly unavailable.
 TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
+# A quota for the whole day (or the account) is used up: retrying within minutes cannot help.
+# Groq says "tokens per day (TPD)", Gemini "...PerDay..." quota ids, OpenAI "insufficient_quota".
+_EXHAUSTED_QUOTA = re.compile(r"per ?day|\([tr]pd\)|daily|insufficient_quota", re.IGNORECASE)
+# How long the provider asks us to wait, when it says so in the body ("try again in 7m12.5s",
+# Gemini's "retryDelay": "41s") rather than in a Retry-After header.
+_TRY_AGAIN_IN = re.compile(r"try again in (?:(\d+)h)?(?:(\d+)m(?!s))?(?:([\d.]+)s)?", re.IGNORECASE)
+_RETRY_DELAY = re.compile(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"')
+# Provider error codes are reported only when they look like an identifier ("rate_limit_exceeded").
+_PROVIDER_CODE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,39}")
+MAX_RETRY_AFTER_SECONDS = 2 * 24 * 3600
 
 
 class LLMError(RuntimeError):
-    """The LLM call failed. Unusable output is the LLMOutputError subclass."""
+    """The LLM call failed. Unusable output is the LLMOutputError subclass.
+
+    `code` classifies a provider failure: "quota_exhausted" (a daily or account quota; waiting
+    minutes will not help),
+    "rate_limit", "unavailable" (5xx), "auth" (401/403), "http_<status>" or "network".
+    """
+
+    def __init__(self, message: str, code: str | None = None, retry_after_seconds: int | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retry_after_seconds = retry_after_seconds
 
 
 class LLMOutputError(LLMError):
@@ -131,9 +154,11 @@ class OpenAICompatibleClient:
             try:
                 response = self._http.post("chat/completions", json=payload)
             except httpx.HTTPError as exc:
-                raise LLMError(f"LLM request failed: {exc.__class__.__name__}") from None
+                raise LLMError(f"LLM request failed: {exc.__class__.__name__}", code="network") from None
             if response.status_code not in TRANSIENT_STATUS or attempt >= self.max_attempts:
                 break
+            if _quota_exhausted(response):
+                break  # retrying a used-up daily quota only burns time
             wait = self._retry_wait(response, attempt)
             if wait > self.max_wait_seconds:
                 break  # e.g. a per-minute quota: waiting that long inside a request is worse than failing
@@ -149,9 +174,7 @@ class OpenAICompatibleClient:
             duration_ms=duration_ms,
         )
         if response.status_code != 200:
-            # The body can echo request details; report the status only.
-            tries = f" after {attempt} attempts" if attempt > 1 else ""
-            raise LLMError(f"LLM provider returned HTTP {response.status_code}{tries}")
+            raise _provider_error(response, attempt)
         try:
             body = response.json()
             content = body["choices"][0]["message"]["content"]
@@ -170,6 +193,68 @@ class OpenAICompatibleClient:
             return max(0.0, float(response.headers.get("retry-after", "")))
         except ValueError:
             return float(2 ** (attempt - 1))
+
+
+def _quota_exhausted(response: httpx.Response) -> bool:
+    return response.status_code == 429 and bool(_EXHAUSTED_QUOTA.search(response.text))
+
+
+def _retry_after(response: httpx.Response) -> int | None:
+    """Seconds the provider asked us to wait (header, then body), or None if it did not say."""
+    seconds: float | None = None
+    try:
+        seconds = float(response.headers.get("retry-after", ""))
+    except ValueError:
+        if match := _TRY_AGAIN_IN.search(response.text):
+            hours, minutes, secs = (float(g) if g else 0.0 for g in match.groups())
+            seconds = hours * 3600 + minutes * 60 + secs if any(match.groups()) else None
+        elif match := _RETRY_DELAY.search(response.text):
+            seconds = float(match.group(1))
+    if seconds is None or not 0 <= seconds <= MAX_RETRY_AFTER_SECONDS:
+        return None
+    return int(-(-seconds // 1))  # whole seconds, rounded up
+
+
+def _provider_code(response: httpx.Response) -> str | None:
+    """The provider's own error code or type ("rate_limit_exceeded", "RESOURCE_EXHAUSTED")."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    error = (body[0] if isinstance(body, list) and body else body) or {}
+    error = error.get("error") if isinstance(error, dict) else None
+    if not isinstance(error, dict):
+        return None
+    for key in ("code", "type", "status"):
+        value = error.get(key)
+        if isinstance(value, str) and _PROVIDER_CODE.fullmatch(value):
+            return value
+    return None
+
+
+def _provider_error(response: httpx.Response, attempts: int) -> LLMError:
+    """An LLMError built from safe metadata only: the body can echo request details (and
+    account ids), so it is never quoted; only a classification and an identifier-like code."""
+    status = response.status_code
+    if _quota_exhausted(response):
+        code = "quota_exhausted"
+    elif status == 429:
+        code = "rate_limit"
+    elif status >= 500:
+        code = "unavailable"
+    elif status in (401, 403):
+        code = "auth"
+    else:
+        code = f"http_{status}"
+    retry_after = _retry_after(response) if status == 429 or status >= 500 else None
+    notes = [n for n in (_provider_code(response),) if n]
+    if code == "quota_exhausted":
+        notes.append("quota used up")
+    if retry_after is not None:
+        notes.append(f"retry in {retry_after} s")
+    tries = f" after {attempts} attempts" if attempts > 1 else ""
+    details = f" ({'; '.join(notes)})" if notes else ""
+    return LLMError(f"LLM provider returned HTTP {status}{tries}{details}", code, retry_after)
 
 
 class ScriptedLLMClient:

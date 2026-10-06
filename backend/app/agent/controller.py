@@ -67,6 +67,7 @@ class QueryError(BaseModel):
     category: str
     message: str
     code: str | None = None  # finer reason, e.g. the validator's rejection code
+    retry_after_seconds: int | None = None  # LLM provider failures: how long the provider asked to wait
 
 
 class QueryMetadata(BaseModel):
@@ -227,8 +228,10 @@ class AgentController:
                 continue
             except LLMError as exc:
                 # A genuine provider failure (network, auth, rate limit): fail fast, no retry.
-                trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc))
-                return finish(self._error(question, meta, "llm_error", str(exc)))
+                trace.record(step, "failed", ms[0], attempt=attempt, error=str(exc), code=exc.code)
+                return finish(
+                    self._error(question, meta, "llm_error", str(exc), exc.code, exc.retry_after_seconds)
+                )
             trace.record(
                 step,
                 duration_ms=ms[0],
@@ -428,12 +431,19 @@ class AgentController:
 
     @staticmethod
     def _error(
-        question: str, meta: QueryMetadata, category: str, message: str, code: str | None = None
+        question: str,
+        meta: QueryMetadata,
+        category: str,
+        message: str,
+        code: str | None = None,
+        retry_after_seconds: int | None = None,
     ) -> AgentResult:
         return AgentResult(
             status="error",
             question=question,
-            error=QueryError(category=str(category), message=message, code=code),
+            error=QueryError(
+                category=str(category), message=message, code=code, retry_after_seconds=retry_after_seconds
+            ),
             metadata=meta,
         )
 
