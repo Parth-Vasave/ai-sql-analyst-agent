@@ -35,11 +35,11 @@ CREATE TABLE shop.customers (
 COMMENT ON TABLE shop.customers IS 'Registered customers.';
 CREATE TABLE shop.orders (
     id integer PRIMARY KEY, customer_id integer NOT NULL, status text NOT NULL,
-    total numeric(10, 2) NOT NULL, ordered_at date NOT NULL
+    total numeric(10, 2) NOT NULL, ordered_at date NOT NULL, note text
 );
 CREATE TABLE shop.order_items (
     id integer PRIMARY KEY, order_id integer NOT NULL REFERENCES shop.orders (id),
-    product text NOT NULL, quantity integer NOT NULL
+    product text NOT NULL, quantity integer NOT NULL, weight_kg real
 );
 CREATE TABLE shop.secret_audit (id integer PRIMARY KEY, note text);
 INSERT INTO shop.customers
@@ -48,10 +48,10 @@ SELECT i, 'Customer ' || lpad(i::text, 2, '0'), 'c' || i || '@example.test', 'ha
 FROM generate_series(1, 25) AS i;
 INSERT INTO shop.orders
 SELECT i, 1 + i % 25, (ARRAY['placed', 'shipped', 'returned'])[1 + i % 3], 10 * i,
-       DATE '2024-01-01' + i
+       DATE '2024-01-01' + i, CASE WHEN i % 2 = 0 THEN 'gift wrap' ELSE 'note ' || i END
 FROM generate_series(1, 60) AS i;
 INSERT INTO shop.order_items
-SELECT i, 1 + i % 60, 'Product ' || (i % 5), 1 + i % 4 FROM generate_series(1, 120) AS i;
+SELECT i, 1 + i % 60, 'Product ' || (i % 5), 1 + i % 4, 0.5 * (1 + i % 4) FROM generate_series(1, 120) AS i;
 GRANT USAGE ON SCHEMA shop TO sql_agent;
 GRANT SELECT ON shop.customers, shop.orders, shop.order_items TO sql_agent;
 """

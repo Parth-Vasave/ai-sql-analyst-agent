@@ -151,6 +151,10 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
   scores them.
 * Scope (--scope): `database` (BIRD's setting: the agent sees one BIRD database) or `all` (one
   connection over all 75 tables, so schema retrieval has to find the right ones).
+* Sampling: BIRD connections are profiled with sampling `full`, so the model also sees the three
+  most frequent values of free-text columns (e.g. how a lap time is written). BIRD is public data;
+  this is the setting its owner would choose. The app's default stays `safe`, so results on BIRD
+  describe a database profiled with `full`.
 * Evidence (--evidence): BIRD gives each question a hint ("evidence"), e.g. "eligible free rate =
   Free Meal Count / Enrollment". `on` appends it to the question as "Hint: ..."; `off` measures
   the agent without it. Published BIRD scores are usually with evidence.
@@ -199,6 +203,20 @@ tokens per minute allows in one request: `all` scope needs a larger quota.
 Evaluation History
 
 Record every run here with its report. Never add numbers that were not produced by a run.
+
+2026-10-05 — BIRD dev split, smoke run of 10 questions (run 20261005-160047-bird-dev-database) — a
+pipeline check, not a result
+Commit: 4808884 (working tree had an unrelated uncommitted change) | Dataset: BIRD dev 2025-11-06
+3c11fb1 | Model: openai/gpt-oss-120b (Groq) | scope: database | evidence: on | answers: template |
+--sample 10 (9 simple, 1 moderate) | row cap 50,000
+Results: evaluation/results/20261005-160047-bird-dev-database.jsonl (local, not committed)
+* Purpose: the Phase 0 pipeline end to end with a real model: 10/10 scored, no provider failures,
+  explanation, plan, checks and token counts recorded for every question
+* Official EX 6/10; Soft F1 72.9%; project scorer 10/10; no retries, no timeouts
+* All four EX misses had the right answer plus columns the question did not ask for (an id, a
+  count, names, a score). Tokens: 2,671 per question on average (about 75 questions a day on
+  Groq's free 200,000 tokens/day)
+* Ten mostly simple questions say nothing about accuracy: no number from this run may be quoted
 
 2026-10-05 — BIRD Mini-Dev, PARTIAL (run 20261005-103021-bird-database) — not comparable
 Commit: 2dbb325 (working tree had uncommitted changes) | Dataset: BIRD Mini-Dev PostgreSQL f65faf4 |
