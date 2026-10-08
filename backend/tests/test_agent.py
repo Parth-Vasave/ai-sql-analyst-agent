@@ -118,6 +118,19 @@ def shop(pg):
     return registry.add(ConnectionConfig(id="shop", name="Shop", url=SecretStr(pg.agent), schemas=["shop"]))
 
 
+def test_definitions_reach_generation_and_repair_but_not_the_trace(shop) -> None:
+    replies = iter([reply("SELECT nope FROM shop.orders LIMIT 5", "x"), reply(VALID_STATUS_SQL, "x")])
+    llm = ScriptedLLMClient(lambda system, user: next(replies))
+    definitions = "late order = shipped more than 7 days after it was placed"
+    result = AgentController(llm, max_rows=100).run("How many late orders?", shop, definitions=definitions)
+
+    assert result.status == "success" and len(llm.calls) == 2  # generation, then one repair
+    assert all(definitions in user for _, user in llm.calls)
+    received = result.trace[0]
+    assert received.detail["definitions_length"] == len(definitions)
+    assert definitions not in json.dumps([e.detail for e in result.trace])
+
+
 def test_question_to_sql_to_result(shop) -> None:
     sql = "SELECT status, count(*) AS orders FROM shop.orders GROUP BY status ORDER BY status LIMIT 10"
     llm = ScriptedLLMClient(lambda system, user: reply(sql, "Counts orders by status.", "bar"))
@@ -581,3 +594,66 @@ def test_chart_is_chosen_for_the_result(shop) -> None:
 def test_no_chart_for_errors(shop) -> None:
     result = AgentController(sequence(reply("DELETE FROM shop.orders")), max_rows=100).run("?", shop)
     assert result.chart is None and "chart_selection" not in [e.step for e in result.trace]
+
+
+# --- several candidates ------------------------------------------------------------------
+
+PLACED = "SELECT count(*) AS orders FROM shop.orders WHERE status = 'placed' LIMIT 10"
+ALL_ORDERS = "SELECT count(*) AS orders FROM shop.orders LIMIT 10"
+
+
+def test_one_candidate_is_the_default_and_samples_nothing(shop) -> None:
+    llm = ScriptedLLMClient(lambda s, u: reply(PLACED))
+    result = AgentController(llm, max_rows=100).run("How many placed orders?", shop)
+    assert result.status == "success" and llm.temperatures == [0.0]
+    assert "candidate_selection" not in [e.step for e in result.trace]
+    assert all("candidate" not in e.detail for e in result.trace)
+
+
+def test_the_result_most_candidates_agree_on_wins(shop) -> None:
+    llm = sequence(reply(ALL_ORDERS), reply(PLACED), reply(PLACED))
+    result = AgentController(llm, max_rows=100, candidates=3).run("How many placed orders?", shop)
+
+    assert result.status == "success" and result.rows == [[20]] and result.sql is not None
+    assert "placed" in result.sql
+    assert llm.temperatures == [0.0, 0.7, 0.7]  # the first is the temperature-0 answer
+    selection = next(e for e in result.trace if e.step == "candidate_selection")
+    assert selection.detail["groups"] == [[2, 3], [1]] and selection.detail["chosen"] == 2
+    assert {e.detail.get("candidate") for e in result.trace if e.step == "sql_generation"} == {1, 2, 3}
+    assert [e.step for e in result.trace][-3:] == ["answer_generation", "chart_selection", "completed"]
+
+
+def test_candidates_stop_once_the_majority_is_decided(shop) -> None:
+    llm = ScriptedLLMClient(lambda s, u: reply(PLACED))
+    result = AgentController(llm, max_rows=100, candidates=3).run("How many placed orders?", shop)
+    assert len(llm.calls) == 2  # two agree: the third cannot change the outcome
+    selection = next(e for e in result.trace if e.step == "candidate_selection")
+    assert selection.detail["candidates"] == 2 and selection.detail["planned"] == 3
+
+
+def test_a_tie_goes_to_the_first_candidate_and_errors_do_not_vote(shop) -> None:
+    llm = sequence(reply(ALL_ORDERS), reply("SELECT nope FROM shop.orders LIMIT 5"), reply(PLACED))
+    result = AgentController(llm, max_rows=100, max_retries=0, candidates=3).run("How many orders?", shop)
+    assert result.status == "success" and result.rows == [[60]]
+    selection = next(e for e in result.trace if e.step == "candidate_selection")
+    assert selection.detail["statuses"] == ["success", "error", "success"]
+    assert selection.detail["groups"] == [[1], [3]] and selection.detail["chosen"] == 1
+
+
+def test_declining_the_same_way_is_a_vote_too(shop) -> None:
+    llm = sequence(reply(PLACED), reply(None, "No such data."), reply(None, "No such data."))
+    result = AgentController(llm, max_rows=100, candidates=3).run("How many returns by courier?", shop)
+    assert result.status == "unanswerable"
+
+
+def test_every_candidate_is_validated(shop) -> None:
+    llm = sequence(reply(PLACED), reply("DELETE FROM shop.orders"), reply("DELETE FROM shop.orders"))
+    result = AgentController(llm, max_rows=100, candidates=3).run("How many placed orders?", shop)
+    assert result.status == "success" and result.rows == [[20]]
+    rejected = [e for e in result.trace if e.step == "sql_validation" and e.status == "failed"]
+    assert [e.detail["candidate"] for e in rejected] == [2, 3]
+
+
+def test_candidates_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="candidates"):
+        AgentController(ScriptedLLMClient(lambda s, u: ""), max_rows=10, candidates=0)

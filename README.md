@@ -32,7 +32,7 @@ question ─▶ schema retrieval ─▶ LLM: plan + SQL ─▶ AST validation �
 | Validation | deterministic | `sqlglot` AST checks, row limit enforced (see below). The SQL that runs is regenerated from the validated tree. |
 | Execution | deterministic | Read-only connection, statement timeout, client-side row cap. |
 | Repair | LLM, bounded | A repairable failure (validator rejection, SQL error, timeout, bad result, malformed model reply) is sent back to the model at most `MAX_RETRIES` times; every repair is validated again. Unsafe intent is never retried. |
-| Result checks | deterministic | Empty result, aggregate over nothing, ranking led by NULL, NULL-only column, row limit reached, duplicates. Missing-value probes catch misspelled filter values (e.g. `'Ivory Coast'`). |
+| Result checks | deterministic | Empty result, aggregate over nothing, ranking led by NULL, NULL-only column, row limit reached, duplicates. Missing-value probes catch filter values and `LIKE` patterns that match nothing (e.g. `'Ivory Coast'`, a time written `'0:01:54%'` where `'1:54.123'` is stored) and show how stored values look. |
 | Chart | deterministic | Chosen from column kinds and values: stat tile, line, bar, scatter or none. The model's suggestion is only a tie-breaker. |
 | Answer | LLM + check | 1–3 sentences. Every number must come from the rows; otherwise a template answer built from the rows is used. |
 
@@ -50,7 +50,9 @@ no conversation state. New SQL is validated exactly like any other.
    - tables and columns must exist in the profile (CTEs cannot shadow real tables); no system
      catalogs, no cross-database references;
    - functions are allow-listed; `pg_*`, `lo_*`, `dblink`, `set_config` and similar are always denied;
-   - sensitive columns are unknown to the validator; `SELECT *` and whole-row references are rejected;
+   - sensitive columns (passwords, keys, e-mail, phone, address, birth dates, ...) are unknown to
+     the validator and never sampled, unless the database's config lists them in `allow_columns`
+     (shown in its status); `SELECT *` and whole-row references are rejected;
    - `LIMIT` is added or clamped to `MAX_ROWS`.
 3. **Limits.** Query timeout, row cap, retry cap, and per-client and global rate limits on
    `POST /api/query`.
@@ -112,7 +114,7 @@ All settings are environment variables; [.env.example](.env.example) documents e
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/query` | Question (+ optional `history`) → plan, SQL, rows, checks, chart, answer, trace, metadata |
+| `POST /api/query` | Question (+ optional `history`, and `definitions` of terms, applied literally) → plan, SQL, rows, checks, chart, answer, trace, metadata |
 | `GET /api/databases` | Connected databases and their status |
 | `GET /api/databases/{id}/profile` | Automatic profile of a database |
 | `POST /api/databases` | Add a database (only with `ALLOW_UI_CONNECTIONS=true`) |

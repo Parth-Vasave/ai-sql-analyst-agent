@@ -24,6 +24,7 @@ class DatabaseInfo(BaseModel):
     sampling: SamplingMode
     status: ConnectionStatus
     issues: list[str]
+    allowed_columns: list[str]  # sensitive-looking columns the owner allowed (allow_columns)
 
     @classmethod
     def from_connection(cls, connection: DatabaseConnection) -> DatabaseInfo:
@@ -35,6 +36,7 @@ class DatabaseInfo(BaseModel):
             sampling=connection.config.sampling,
             status=connection.status,
             issues=connection.issues,
+            allowed_columns=connection.config.allow_columns,
         )
 
 
@@ -44,6 +46,9 @@ class QueryRequest(BaseModel):
     # Earlier turns of the conversation, oldest first, for follow-up questions ("what about
     # China?"). The client keeps the conversation; the server stores nothing between requests.
     history: list[Turn] = Field(default=[], max_length=MAX_HISTORY_TURNS)
+    # The user's definitions of terms used in the question ("active customer = ordered in the
+    # last 90 days"), applied literally. Untrusted user input, like the question.
+    definitions: str | None = Field(default=None, max_length=2000)
 
 
 class AddDatabaseRequest(BaseModel):

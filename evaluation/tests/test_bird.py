@@ -12,12 +12,13 @@ from pydantic import SecretStr
 
 from evaluation.bird import (
     bird_url,
+    definitions_for,
     execution_accuracy,
     items_for,
     load_dev_questions,
     load_questions,
+    miss_shape,
     only_nulls,
-    question_text,
     soft_f1,
     stratified_sample,
     translate_sqlite,
@@ -47,13 +48,13 @@ def test_questions_are_converted(tmp_path: Path) -> None:
     assert second["id"] == "B1234" and second["category"] == "challenging"
 
 
-def test_evidence_is_appended_only_when_asked_and_present(tmp_path: Path) -> None:
+def test_evidence_is_given_as_definitions_only_when_asked_and_present(tmp_path: Path) -> None:
     path = tmp_path / "q.json"
     path.write_text(json.dumps(RAW))
     with_hint, without_hint = load_questions(path)
-    assert question_text(with_hint, evidence=True) == "Who won?\nHint: won = position 1"
-    assert question_text(with_hint, evidence=False) == "Who won?"
-    assert question_text(without_hint, evidence=True) == "How many?"
+    assert definitions_for(with_hint, evidence=True) == "won = position 1"
+    assert definitions_for(with_hint, evidence=False) is None
+    assert definitions_for(without_hint, evidence=True) is None
 
 
 def test_bird_url_keeps_the_account_and_server() -> None:
@@ -172,3 +173,31 @@ def test_dev_items_carry_the_translated_ground_truth(monkeypatch: pytest.MonkeyP
                 "ground_truth_sql": {"D0001": 'SELECT "A" FROM t'}}  # fmt: skip
     (item,) = items_for("dev", expected)
     assert item["id"] == "D0001" and item["ground_truth"]["sql"] == 'SELECT "A" FROM t'
+
+
+GOLD = [("Hamilton", 1), ("Vettel", 2)]
+
+
+@pytest.mark.parametrize(
+    ("predicted", "shape"),
+    [
+        ([], "empty result"),
+        ([("Hamilton", 1, 44), ("Vettel", 2, 5)], "extra columns"),
+        ([(44, "Hamilton", 1), (5, "Vettel", 2)], "extra columns"),  # any position, any order
+        ([("Hamilton",), ("Vettel",)], "missing columns"),
+        ([("Hamilton", 1, "x"), ("Vettel", 7, "y")], "different columns"),
+        ([(1, "Hamilton"), (2, "Vettel")], "column order"),
+        ([("hamilton", Decimal("1.0")), ("Vettel", "2")], "value format"),
+        ([("Hamilton", 1)], "missing rows"),
+        ([("Hamilton", 1), ("Vettel", 2), ("Alonso", 3)], "extra rows"),
+        ([("Hamilton", 1), ("Alonso", 3)], "different rows"),
+        ([("Alonso", 3)], "different values"),
+    ],
+)
+def test_miss_shape_names_the_first_difference(predicted: list, shape: str) -> None:
+    assert not execution_accuracy(predicted, GOLD)
+    assert miss_shape(predicted, GOLD) == shape
+
+
+def test_miss_shape_when_nothing_was_expected() -> None:
+    assert miss_shape([(1,)], []) == "rows where none expected"

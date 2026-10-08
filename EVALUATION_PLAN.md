@@ -155,9 +155,16 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
   most frequent values of free-text columns (e.g. how a lap time is written). BIRD is public data;
   this is the setting its owner would choose. The app's default stays `safe`, so results on BIRD
   describe a database profiled with `full`.
+* Sensitive columns: the app hides every column whose name looks like a birth date, e-mail, phone
+  and the like. BIRD connections allow the four birth-date columns (formula_1.drivers.dob,
+  financial.client.birth_date, thrombosis_prediction.patient.birthday,
+  european_football_2.player.birthday) through `allow_columns`, as an owner of this long-published
+  data would (evaluation/bird.py ALLOW_COLUMNS). E-mail and phone columns stay hidden; questions that
+  need them count as misses. Runs before this change hid `dob` and `birth_date` and showed
+  `birthday` and california_schools' `admemail1-3`.
 * Evidence (--evidence): BIRD gives each question a hint ("evidence"), e.g. "eligible free rate =
-  Free Meal Count / Enrollment". `on` appends it to the question as "Hint: ..."; `off` measures
-  the agent without it. Published BIRD scores are usually with evidence.
+  Free Meal Count / Enrollment". `on` passes it as the user's definitions (the API's optional
+  `definitions` field, applied literally); `off` measures the agent without it. Published BIRD scores are usually with evidence.
 * Scoring, headline: BIRD's official execution accuracy (EX) and Mini-Dev's Soft F1, computed as
   BIRD's evaluation scripts compute them: the agent's final SQL and the ground-truth SQL are run
   again and their raw rows compared (EX: the same set of rows, values exactly as the driver
@@ -171,6 +178,11 @@ all), with cryptic column names, dirty values and no column comments. Difficulty
 * Scoring, beside it: the project's own verdict (above) and set match (BIRD's row-set rule with the
   project's tolerant values: 0.1% relative, numbers as text). They show how many misses are about
   precision, types or column choice rather than the answer.
+* Miss shapes: for every official-EX miss the scorer records how the result differs from the ground
+  truth, from the rows alone (`ex_miss`: extra, missing or different columns, column order, value
+  format, missing, extra or different rows, different values, empty result, no result, answer
+  failed); the report counts them. A diagnosis, never a score. Runs recorded before it:
+  `python -m evaluation.bird misses <results.jsonl>` re-runs their SQL read-only (no LLM).
 * Development set (--split dev): BIRD's other 1,034 dev questions on the same databases (the
   2025-11-06 revision; `python -m scripts.bird download-dev`). They are for diagnosing misses and
   tuning, so that the 500 Mini-Dev questions (--split test, the default) are run only to measure a
