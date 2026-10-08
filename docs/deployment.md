@@ -43,7 +43,7 @@ in a screenshot.
 ## 1. Create the database and the read-only role
 
 1. In Neon, create a project. Choose the region closest to where the backend will run
-   (`render.yaml` uses Render's Oregon region; Neon's matching region is AWS US West 2, Oregon).
+   (`render.yaml` uses Render's Ohio region; Neon's matching region is AWS US East 2, Ohio).
 2. Click **Connect**, **turn off "Connection pooling"**, and copy the connection string. It
    connects as the database **owner** and looks like
    `postgresql://<owner>:<password>@<endpoint>.<region>.aws.neon.tech/<db>?sslmode=require`.
@@ -97,7 +97,7 @@ filled in. It rebuilds only when something under `backend/` changes.
 
 1. Push your copy of the repository to GitHub. In Render, choose **New → Blueprint**, connect the
    repository, and Render reads `render.yaml`. Change `region` in the file first if your Neon
-   database is not in Oregon.
+   database is not in Ohio.
 2. Render asks for the three values the file leaves out:
 
    | Variable | Value |

@@ -7,7 +7,7 @@ services:
     runtime: docker
     plan: free
     # Pick the region closest to your Neon database (oregon, ohio, virginia, frankfurt, singapore).
-    region: oregon
+    region: ohio
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /api/health
