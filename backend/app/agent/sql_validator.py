@@ -57,6 +57,33 @@ ALLOWED_UNMODELED_FUNCTIONS = frozenset(
 # access, large objects, configuration, server and session introspection).
 _DENIED_PREFIXES = ("pg_", "lo_", "dblink", "file_", "set_config", "current_setting", "query_to_xml")
 
+# Dangerous functions denied by name, whatever engine parses them: delay/resource abuse,
+# filesystem and OS access, cross-session advisory locking, and error-based XML extraction.
+# (LOAD_FILE, SLEEP and BENCHMARK are also unmodeled, so the allow-list already rejects them;
+# this is the explicit second statement of intent, and covers sqlglot modeling them later.)
+_DENIED_FUNCTIONS = frozenset(
+    {
+        "benchmark",
+        "extractvalue",
+        "get_lock",
+        "is_free_lock",
+        "is_used_lock",
+        "load_file",
+        "master_pos_wait",
+        "release_lock",
+        "sleep",
+        "sys_eval",
+        "sys_exec",
+        "updatexml",
+    }
+)
+
+# Safe, engine-specific functions sqlglot leaves unmodeled (exp.Anonymous); allowed per dialect.
+_ALLOWED_BY_DIALECT: dict[str, frozenset[str]] = {
+    # NOW and UNIX_TIMESTAMP are ordinary MySQL functions sqlglot does not model.
+    "mysql": frozenset({"now", "unix_timestamp"}),
+}
+
 
 class RejectionCode(StrEnum):
     SYNTAX = "syntax"
@@ -119,11 +146,14 @@ def _function_name(node: exp.Func) -> str:
     return (node.name if isinstance(node, exp.Anonymous) else node.sql_name()).lower()
 
 
-def _check_functions(tree: exp.Expr) -> None:
+def _check_functions(tree: exp.Expr, dialect: str) -> None:
+    allowed = ALLOWED_UNMODELED_FUNCTIONS | _ALLOWED_BY_DIALECT.get(dialect, frozenset())
     for node in tree.find_all(exp.Func):
         name = _function_name(node)
-        if name.startswith(_DENIED_PREFIXES) or (
-            isinstance(node, exp.Anonymous) and name not in ALLOWED_UNMODELED_FUNCTIONS
+        if (
+            name in _DENIED_FUNCTIONS
+            or name.startswith(_DENIED_PREFIXES)
+            or (isinstance(node, exp.Anonymous) and name not in allowed)
         ):
             raise _reject(RejectionCode.FORBIDDEN_FUNCTION, f"Function {name}() is not allowed.")
 
@@ -263,7 +293,7 @@ def validate_sql(sql: str, profile: DatabaseProfile, dialect: str, max_rows: int
     """Accept or reject generated SQL. Raises SQLRejectedError with a machine-readable code."""
     tree = _parse(sql, dialect)
     _check_forbidden_nodes(tree)
-    _check_functions(tree)
+    _check_functions(tree, dialect)
     tables = _check_tables(tree, profile)
     _check_columns(tree, profile, dialect)
     limit, action = _enforce_limit(tree, max_rows)

@@ -200,11 +200,18 @@ are recorded in [EVALUATION_PLAN.md](EVALUATION_PLAN.md) only once a run exists.
 
 ## Known limitations
 
+<<<<<<< HEAD
 - PostgreSQL only; MySQL is not implemented.
 - The rate limiter is in memory per process. Multi-instance or serverless deployments need a shared
   store ([#7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7)).
 - No hosted demo yet. [docs/deployment.md](docs/deployment.md) describes a Neon + Vercel + Railway
   setup; it has not been run end to end.
+=======
+- PostgreSQL and MySQL/MariaDB are supported; other engines are not.
+- The rate limiter is in memory per process. Multi-instance or serverless deployments need a shared store
+  (see [Issue #7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7)).
+- Public deployment (Vercel + Neon) is not done yet; deployment guidance is in [docs/deployment.md](docs/deployment.md).
+>>>>>>> 4f5091f (added mysql to the repo as you wanted)
 - Results depend on the chosen model; only one model has been evaluated so far.
 
 ## Licence and data

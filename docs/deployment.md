@@ -197,7 +197,100 @@ nothing.
 
 ## Other hosts
 
+<<<<<<< HEAD
 Render and Fly.io can run the same `backend/Dockerfile`. Use `backend` as the build context and
 route traffic to port 8000, since the app does not read `PORT`. Both put a proxy in front of the
 app, so the `TRUSTED_PROXY_HOPS` advice above applies: keep `0` unless you have confirmed the hop
 count from the host's documentation. The variables, the CORS setting and the checks are the same.
+=======
+## Known limitations
+
+These are copied from the repository's `Known limitations` section and must not be weakened:
+
+- **PostgreSQL and MySQL/MariaDB are supported**; other engines are not.
+- **The rate limiter is in memory per process.** Multi-instance or serverless deployments need a
+  shared store (see Issue #7: https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7).
+- **Public deployment (Vercel + Neon) is not done yet** — this guide is the first documented path.
+- **Results depend on the chosen model**; only one model has been evaluated so far.
+- The in-memory rate limiter means `RATE_LIMIT_PER_MINUTE` and `RATE_LIMIT_PER_DAY` are per
+  process, not shared across instances.
+- `ALLOW_UI_CONNECTIONS` is local/self-hosted only; never enable it on a public deployment.
+
+---
+
+## Alternative container hosts
+
+The walkthrough uses **Railway**, but the guide is the same for Render and Fly.io. The only things
+that change are the UI and a few settings.
+
+### Render
+
+- **Build**: `pip install -r requirements.txt`
+- **Start**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log`
+- Render auto-inspects the `backend/Dockerfile`; if you use the Docker runtime, choose **Dockerfile**
+  and set the build context to `backend`.
+- Enable **Auto-suspend** (free tier) — Railway behaves the same way.
+- Render does not expose a port by default; the app binds `0.0.0.0:8000`.
+
+### Fly.io
+
+- Use the same `backend/Dockerfile`; Fly builds it and starts with
+  `uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log`.
+- Fly apps publish on `$PORT`; the app ignores it and hard-codes `8000`.
+- Fly's load balancer terminates TLS and adds `X-Forwarded-For`, but it is only the edge; keep
+  `TRUSTED_PROXY_HOPS=0` until you add a proxy of your own.
+
+### Shared gotcha
+
+For all three hosts, the **port is 8000** and the **start command** is the Dockerfile CMD. The app
+never reads a `PORT` variable. The only environment variable that changes is `CORS_ORIGINS` (add
+your host's public domain) and `TRUSTED_PROXY_HOPS` (0 for all three, until you add a proxy).
+
+---
+
+## Environment variable reference
+
+### Backend / container host (complete)
+
+| Variable | Default | Required | Meaning |
+|---|---|---|---|
+| `DATABASE_URL` | — | **Yes** | `postgresql://sql_agent:…@<neon-host>.neon.tech/<db>?sslmode=require` |
+| `LLM_API_KEY` | — | **Yes** | LLM provider key (server-side) |
+| `LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` | No | OpenAI-compatible endpoint base |
+| `LLM_MODEL` | `gemini-3.8-flash` | No | Model name |
+| `QUERY_TIMEOUT_SECONDS` | `5` | No | Max query duration (0–60) |
+| `MAX_RETRIES` | `2` | No | Max LLM repair attempts (0–5) |
+| `MAX_ROWS` | `1000` | No | Client-side result cap (1–10000) |
+| `ANSWER_MODE` | `llm` | No | `llm` or `template` |
+| `RATE_LIMIT_PER_MINUTE` | `10` | No | Per-client per-minute limit (`0`=off) |
+| `RATE_LIMIT_PER_DAY` | `200` | No | Global per-day limit (`0`=off) |
+| `TRUSTED_PROXY_HOPS` | `0` | No | Reverse-proxy hops that append to `X-Forwarded-For` |
+| `ALLOW_UI_CONNECTIONS` | `false` | **No — keep false** | Add databases through UI/API. Local use only. |
+| `CORS_ORIGINS` | `["http://localhost:5173"]` | No | Comma-separated allowed origins |
+| `DATABASES_CONFIG` | — | No | Path to TOML of `[[databases]]`; URLs via env vars named by `url_env` |
+| `LOG_LEVEL` | `INFO` | No | Python logging level |
+
+### Frontend / Vercel (only two safe client variables)
+
+| Variable | Safe? | Meaning |
+|---|---|---|
+| `VITE_API_BASE_URL` | **Yes** | Backend URL, no trailing slash |
+| `VITE_API_PROXY_TARGET` | **Yes** (dev) | Dev proxy target, only used by Vite dev server |
+
+Everything else that appears in `.env.example` besides these two is a **server secret**. The
+complete forbidden list is:
+
+```text
+LLM_API_KEY
+DATABASE_URL
+DATABASES_CONFIG
+POSTGRES_PASSWORD
+SQL_AGENT_PASSWORD
+ADMIN_DATABASE_URL
+```
+
+---
+
+*This guide was written against the repository state as of the current commit: Dockerfile, startup
+configuration, API routes, rate limiter, CORS, frontend Vite config, and `database/permissions.sql`.*
+>>>>>>> 4f5091f (added mysql to the repo as you wanted)

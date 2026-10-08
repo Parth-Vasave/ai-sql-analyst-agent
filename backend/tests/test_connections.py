@@ -20,7 +20,7 @@ def test_postgres_scheme_and_driver_are_normalized() -> None:
     assert connection.engine.url.drivername == "postgresql+psycopg"
 
 
-@pytest.mark.parametrize("url", ["mysql://u:p@localhost/db", "sqlite:///x.db", "mongodb://localhost/db"])
+@pytest.mark.parametrize("url", ["mssql://u:p@localhost/db", "sqlite:///x.db", "mongodb://localhost/db"])
 def test_unsupported_engines_are_rejected(url: str) -> None:
     with pytest.raises((UnsupportedDatabaseError, ValueError)):
         _registry().add(ConnectionConfig(id="a", name="a", url=SecretStr(url)), verify=False)
