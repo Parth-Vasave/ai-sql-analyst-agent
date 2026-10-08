@@ -63,15 +63,19 @@ in a screenshot.
    `permissions.sql` is idempotent: re-run the script to rotate the `sql_agent` password or change
    the timeout. It gives `sql_agent` `SELECT` on the four data tables and nothing else.
 
-4. **Check that `sql_agent` really cannot write.** Connect **as `sql_agent`**, never as the owner:
+4. **Check that `sql_agent` really cannot write.** Connect **as `sql_agent`**, never as the owner.
+   The first command turns the session's read-only default off, so the second one tests the
+   missing privileges rather than read-only mode. They must be separate `-c` options: in one
+   string they run as one transaction, which has already started read-only.
 
    ```bash
-   psql "postgresql://sql_agent:${SQL_AGENT_PASSWORD}@<endpoint>.<region>.aws.neon.tech/<db>?sslmode=require" \
-     -c "SET default_transaction_read_only = off; CREATE TABLE should_fail (id int);"
+   export AGENT_URL="postgresql://sql_agent:${SQL_AGENT_PASSWORD}@${ADMIN_DATABASE_URL##*@}"
+   psql "$AGENT_URL" -c "SET default_transaction_read_only = off" -c "CREATE TABLE should_fail (id int);"
    ```
 
-   This must fail with `permission denied`. If it succeeds, you connected as the wrong role: drop
-   the table and check the URL. The same checks run in CI against a disposable database
+   This must fail with `permission denied for schema public`. `cannot execute CREATE TABLE in a
+   read-only transaction` means read-only mode stopped it and the privileges were not tested. If
+   it succeeds, you connected as the wrong role: drop the table and check the URL. The same checks run in CI against a disposable database
    (`scripts/tests/test_database.py`).
 
 ## 2. Load the data
