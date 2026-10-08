@@ -203,8 +203,8 @@ are recorded in [EVALUATION_PLAN.md](EVALUATION_PLAN.md) only once a run exists.
 - PostgreSQL only; MySQL is not implemented.
 - The rate limiter is in memory per process. Multi-instance or serverless deployments need a shared
   store ([#7](https://github.com/Parth-Vasave/ai-sql-analyst-agent/issues/7)).
-- No hosted demo yet. [docs/deployment.md](docs/deployment.md) describes a Neon + Vercel + Railway
-  setup; it has not been run end to end.
+- No hosted demo yet. [docs/deployment.md](docs/deployment.md) describes a free Neon + Render +
+  Vercel + Groq setup; it has not been run end to end.
 - Results depend on the chosen model; only one model has been evaluated so far.
 
 ## Licence and data
