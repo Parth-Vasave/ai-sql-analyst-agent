@@ -1,0 +1,43 @@
+# Render Blueprint for the backend (free plan). See docs/deployment.md.
+# Values marked sync: false are secrets or deployment-specific: Render asks for them when the
+# Blueprint is created, and they are never stored in this file.
+services:
+  - type: web
+    name: ai-sql-analyst-api
+    runtime: docker
+    plan: free
+    # Pick the region closest to your Neon database (oregon, ohio, virginia, frankfurt, singapore).
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      # Neon's DIRECT connection string as the read-only sql_agent role (not the owner, and not
+      # the -pooler host: the pooler rejects the per-session options the app sets).
+      - key: DATABASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      # JSON list with the Vercel origin, e.g. ["https://<app>.vercel.app"]
+      - key: CORS_ORIGINS
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      # Never true on a public deployment: it lets any visitor make the server connect anywhere.
+      - key: ALLOW_UI_CONNECTIONS
+        value: "false"
+      # Sized for Groq's free tier for gpt-oss-120b (8K tokens/minute, 200K tokens/day).
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "3"
+      - key: RATE_LIMIT_PER_DAY
+        value: "40"
+      - key: TRUSTED_PROXY_HOPS
+        value: "0"
+      - key: ANSWER_MODE
+        value: llm
