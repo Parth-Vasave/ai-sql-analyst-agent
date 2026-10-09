@@ -39,6 +39,20 @@ def test_invented_numbers_are_caught(answer: str, bad: list[str]) -> None:
     assert ungrounded_numbers(answer, QUESTION, ROWS) == bad
 
 
+@pytest.mark.parametrize(
+    ("answer", "value"),
+    [
+        ("About 3 Mt.", 2.5),  # half rounded up
+        ("About 2 Mt.", 2.5),  # half rounded to even
+        ("A share of 0.13.", 0.125),
+        ("A share of 13%.", 0.125),  # fraction as percent, half rounded up
+        ("A change of -3 Mt.", -2.5),
+    ],
+)
+def test_halves_rounded_either_way_are_grounded(answer: str, value: float) -> None:
+    assert ungrounded_numbers(answer, "q", [[value]]) == []
+
+
 def test_numbers_inside_words_and_the_row_count_are_ignored() -> None:
     assert ungrounded_numbers("Both CO2 and PM2 figures cover 2 rows.", "q", ROWS) == []
 
