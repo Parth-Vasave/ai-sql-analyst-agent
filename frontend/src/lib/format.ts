@@ -8,6 +8,12 @@ export function isYearColumn(column: string): boolean {
   return /(^|_)year$/i.test(column)
 }
 
+/** A non-numeric value as text. JSON values (json_build_object, jsonb_agg) arrive as objects and
+ * arrays, which String() would turn into "[object Object]" or a bare comma list. */
+export function cellText(value: unknown): string {
+  return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
+}
+
 /**
  * `digits` fixes the fraction digits so a right-aligned column's decimal points line up
  * (see `columnDecimals`); without it, a number shows up to 3 decimals as it comes.
@@ -24,7 +30,7 @@ export function formatCell(value: unknown, unit?: string, column?: string, digit
           : value.toLocaleString('en-US', { maximumFractionDigits: 3 })
     return unit ? `${formatted} ${unit}` : formatted
   }
-  return String(value)
+  return cellText(value)
 }
 
 export function formatRowCount(n: number): string {

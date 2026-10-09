@@ -17,4 +17,8 @@ describe('toCsv', () => {
   it('renders null and undefined as empty cells', () => {
     expect(toCsv(['a', 'b'], [[null, undefined]])).toBe('a,b\n,')
   })
+
+  it('writes JSON values as JSON', () => {
+    expect(toCsv(['info'], [[{ name: 'Oslo' }], [[1, 2]]])).toBe('info\n"{""name"":""Oslo""}"\n"[1,2]"')
+  })
 })

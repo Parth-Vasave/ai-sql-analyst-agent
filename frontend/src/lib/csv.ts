@@ -1,5 +1,7 @@
+import { cellText } from './format'
+
 function escapeCell(value: unknown): string {
-  const text = value == null ? '' : String(value)
+  const text = value == null ? '' : cellText(value)
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
