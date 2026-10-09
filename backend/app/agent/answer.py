@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -131,7 +131,12 @@ def _matches(number: Decimal, value: Decimal) -> bool:
     candidates = [value]
     if abs(value) <= 1:
         candidates.append(value * 100)  # a 0-1 fraction written as a percentage
-    return any(abs(c.quantize(quantum) - number) == 0 or c == number for c in candidates)
+    # A half may be rounded up (2.5 -> 3, the usual way) or to even (2.5 -> 2, Python's round()).
+    return any(
+        c == number or c.quantize(quantum, rounding) == number
+        for c in candidates
+        for rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN)
+    )
 
 
 def ungrounded_numbers(
