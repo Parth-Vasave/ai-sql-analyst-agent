@@ -93,7 +93,7 @@ def query(
         connection = ready[0]
     try:
         definitions = (body.definitions or "").strip() or None
-        return agent.run(body.question.strip(), connection, body.history, definitions)
+        return agent.run(body.question, connection, body.history, definitions)
     except DatabaseNotReadyError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
