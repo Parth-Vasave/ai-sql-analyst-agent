@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, StringConstraints
 
 from app.agent.sql_generator import MAX_HISTORY_TURNS, Turn
 from app.database.connections import ConnectionStatus, DatabaseConnection
@@ -41,7 +41,8 @@ class DatabaseInfo(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=500)
+    # Stripped before the length check, so a blank question is rejected before it reaches the LLM.
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
     database_id: str | None = None  # defaults to the first ready database
     # Earlier turns of the conversation, oldest first, for follow-up questions ("what about
     # China?"). The client keeps the conversation; the server stores nothing between requests.
