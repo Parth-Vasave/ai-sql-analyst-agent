@@ -28,6 +28,10 @@ describe('formatCell', () => {
   it('passes strings through unchanged', () => {
     expect(formatCell('China')).toBe('China')
   })
+  it('shows JSON values as JSON', () => {
+    expect(formatCell({ name: 'Oslo', rank: 1 })).toBe('{"name":"Oslo","rank":1}')
+    expect(formatCell(['a', 'b'])).toBe('["a","b"]')
+  })
 })
 
 describe('formatRowCount', () => {
